@@ -1,0 +1,64 @@
+#include "dlms/client/client_options.hpp"
+
+#include "dlms/client/client_status.hpp"
+
+#include <gtest/gtest.h>
+
+TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
+{
+  const dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+
+  EXPECT_EQ(dlms::client::ClientProfile::WrapperTcp, options.profile);
+  EXPECT_EQ(dlms::client::ClientSecurityMode::None, options.securityMode);
+  EXPECT_STREQ("127.0.0.1", options.wrapperTcp.host);
+  EXPECT_EQ(4059u, options.wrapperTcp.port);
+  EXPECT_EQ(16u, options.wrapperTcp.sourceWPort);
+  EXPECT_EQ(1u, options.wrapperTcp.destinationWPort);
+  EXPECT_EQ(16u, options.clientSap);
+  EXPECT_EQ(1u, options.serverSap);
+  EXPECT_EQ(5000u, options.connectTimeoutMs);
+  EXPECT_EQ(5000u, options.requestTimeoutMs);
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+}
+
+TEST(ClientOptions, RejectsInvalidEndpointAndSapValues)
+{
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+
+  options.wrapperTcp.host = "";
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.wrapperTcp.port = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.wrapperTcp.sourceWPort = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.clientSap = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+}
+
+TEST(ClientOptions, RejectsZeroTimeouts)
+{
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+
+  options.connectTimeoutMs = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.requestTimeoutMs = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+}
