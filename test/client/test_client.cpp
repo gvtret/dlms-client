@@ -188,6 +188,28 @@ TEST(DlmsClient, StartsDisconnectedAndConnectsChannel)
   EXPECT_TRUE(channel.open);
 }
 
+TEST(DlmsClient, OptionsConstructorStartsDisconnected)
+{
+  const dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  dlms::client::DlmsClient client(options);
+
+  EXPECT_EQ(dlms::client::ClientState::Disconnected, client.State());
+  EXPECT_FALSE(client.IsConnected());
+  EXPECT_FALSE(client.IsAssociated());
+}
+
+TEST(DlmsClient, OptionsConstructorReportsInvalidOptionsOnConnect)
+{
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  options.wrapperTcp.host = "";
+  dlms::client::DlmsClient client(options);
+
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument, client.Connect());
+  EXPECT_EQ(dlms::client::ClientState::Disconnected, client.State());
+}
+
 TEST(DlmsClient, ConnectMapsOpenFailure)
 {
   FakeApduChannel channel;

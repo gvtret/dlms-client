@@ -16,7 +16,8 @@ Lifecycle:
 - `Connect()` opens transport and APDU channel;
 - `OpenAssociation()` requires connected state;
 - successful association moves to associated state;
-- `ReleaseAssociation()` returns to connected state;
+- `ReleaseAssociation()` returns to disconnected state because the current
+  association client closes the APDU channel after RLRE;
 - `Close()` returns to disconnected state from connected or associated state;
 - repeated close is idempotent.
 

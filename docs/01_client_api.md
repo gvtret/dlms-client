@@ -80,6 +80,8 @@ later, but they must remain thin wrappers over this encoded-data API.
 class DlmsClient
 {
 public:
+  explicit DlmsClient(const DlmsClientOptions& options);
+
   DlmsClient(
     dlms::profile::IApduChannel& channel,
     dlms::association::AssociationClient& association);
@@ -111,9 +113,11 @@ public:
 
 ## 5. Lifecycle Rules
 
-- `DlmsClient` receives an already constructed APDU channel and association
-  client in the current implementation phase.
-- `Connect()` opens the injected APDU channel through `AssociationClient`.
+- The options constructor owns a Wrapper/TCP byte stream, Wrapper/TCP APDU
+  channel, association client, and xDLMS service client.
+- The injected constructor receives an already constructed APDU channel and
+  association client for deterministic tests or external composition.
+- `Connect()` opens the APDU channel through `AssociationClient`.
 - `OpenAssociation()` requires a connected channel.
 - `Get()`, `Set()`, and `Action()` require an established association.
 - `ReleaseAssociation()` is idempotent when already not associated. In the

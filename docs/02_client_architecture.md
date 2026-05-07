@@ -38,11 +38,16 @@ flowchart TB
 
 ```mermaid
 flowchart LR
+  Options["DlmsClientOptions"]
   Client["DlmsClient"]
+  Stream["TcpStreamTransport"]
   Channel["IApduChannel"]
   Association["AssociationClient"]
   Services["XdlmsClient"]
 
+  Options --> Client
+  Client --> Stream
+  Stream --> Channel
   Channel --> Client
   Association --> Client
   Client --> Association
@@ -57,8 +62,12 @@ flowchart LR
 classDiagram
   class DlmsClient {
     -ClientState state
+    -TcpStreamTransport ownedStream
+    -WrapperTcpProfileChannel ownedChannel
+    -AssociationClient ownedAssociation
     -AssociationClient& association
     -XdlmsClient xdlms
+    +DlmsClient(options)
     +DlmsClient(IApduChannel, AssociationClient)
     +Connect() ClientStatus
     +OpenAssociation() ClientStatus
@@ -77,10 +86,16 @@ classDiagram
     Associated
   }
 
+  class DlmsClientOptions
+  class TcpStreamTransport
+  class WrapperTcpProfileChannel
   class IApduChannel
   class AssociationClient
   class XdlmsClient
 
+  DlmsClient --> DlmsClientOptions
+  DlmsClient --> TcpStreamTransport
+  DlmsClient --> WrapperTcpProfileChannel
   DlmsClient --> ClientState
   DlmsClient --> IApduChannel
   DlmsClient --> AssociationClient
@@ -101,10 +116,11 @@ stateDiagram-v2
 
 ## 7. Error Model
 
-Public runtime calls return `ClientStatus`. The injected-channel phase does not
-own transport construction. Its `ReleaseAssociation()` follows the existing
-`AssociationClient::Release()` contract, which sends RLRQ, receives RLRE, closes
-the channel, and returns the facade to `Disconnected`.
+Public runtime calls return `ClientStatus`. Invalid constructor options are
+stored and returned by `Connect()` because constructors do not throw. The
+options-owned Wrapper/TCP path uses `AssociationClient::Release()`, which sends
+RLRQ, receives RLRE, closes the channel, and returns the facade to
+`Disconnected`.
 
 ## 8. Test Strategy
 

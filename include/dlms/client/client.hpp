@@ -5,9 +5,12 @@
 
 #include "dlms/association/association_client.hpp"
 #include "dlms/profile/apdu_channel.hpp"
+#include "dlms/profile/wrapper_tcp_profile_channel.hpp"
+#include "dlms/transport/tcp_stream_transport.hpp"
 #include "dlms/xdlms/xdlms_client.hpp"
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace dlms {
@@ -26,9 +29,13 @@ using CosemMethodDescriptor = dlms::xdlms::CosemMethodDescriptor;
 class DlmsClient
 {
 public:
+  explicit DlmsClient(const DlmsClientOptions& options);
+
   DlmsClient(
     dlms::profile::IApduChannel& channel,
     dlms::association::AssociationClient& association);
+
+  ~DlmsClient();
 
   ClientStatus Connect();
   ClientStatus OpenAssociation();
@@ -57,9 +64,13 @@ private:
   DlmsClient(const DlmsClient&);
   DlmsClient& operator=(const DlmsClient&);
 
+  std::unique_ptr<dlms::transport::TcpStreamTransport> ownedStream_;
+  std::unique_ptr<dlms::profile::WrapperTcpProfileChannel> ownedChannel_;
+  std::unique_ptr<dlms::association::AssociationClient> ownedAssociation_;
   dlms::association::AssociationClient& association_;
   dlms::xdlms::XdlmsClient xdlms_;
   ClientState state_;
+  ClientStatus constructionStatus_;
 };
 
 const char* ClientStateName(ClientState state);

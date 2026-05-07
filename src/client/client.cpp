@@ -1,5 +1,10 @@
 #include "dlms/client/client.hpp"
 
+#include "dlms/association/association_types.hpp"
+#include "dlms/profile/profile_types.hpp"
+
+#include <memory>
+
 namespace dlms {
 namespace client {
 namespace {
@@ -67,19 +72,101 @@ ClientStatus MapXdlmsStatus(dlms::xdlms::XdlmsStatus status)
   return ClientStatus::InternalError;
 }
 
+dlms::transport::TcpStreamTransportOptions MakeTcpOptions(
+  const DlmsClientOptions& options)
+{
+  dlms::transport::TcpStreamTransportOptions tcp;
+  tcp.host = options.wrapperTcp.host == 0 ? "" : options.wrapperTcp.host;
+  tcp.port = options.wrapperTcp.port;
+  tcp.connectTimeout.milliseconds = options.connectTimeoutMs;
+  tcp.readTimeout.milliseconds = options.requestTimeoutMs;
+  tcp.writeTimeout.milliseconds = options.requestTimeoutMs;
+  return tcp;
+}
+
+dlms::profile::ApduChannelOptions MakeWrapperTcpChannelOptions(
+  const DlmsClientOptions& options)
+{
+  dlms::profile::ApduChannelOptions channel =
+    dlms::profile::DefaultApduChannelOptions();
+  channel.localWrapperPort = options.wrapperTcp.sourceWPort;
+  channel.remoteWrapperPort = options.wrapperTcp.destinationWPort;
+  return channel;
+}
+
+dlms::association::AssociationOptions MakeAssociationOptions(
+  const DlmsClientOptions&)
+{
+  dlms::association::AssociationOptions association =
+    dlms::association::DefaultAssociationOptions();
+  association.authenticationMode =
+    dlms::association::AuthenticationMode::None;
+  return association;
+}
+
+std::unique_ptr<dlms::transport::TcpStreamTransport> CreateTcpStream(
+  const DlmsClientOptions& options)
+{
+  return std::unique_ptr<dlms::transport::TcpStreamTransport>(
+    new dlms::transport::TcpStreamTransport(MakeTcpOptions(options)));
+}
+
+std::unique_ptr<dlms::profile::WrapperTcpProfileChannel> CreateWrapperChannel(
+  dlms::transport::IByteStream& stream,
+  const DlmsClientOptions& options)
+{
+  return std::unique_ptr<dlms::profile::WrapperTcpProfileChannel>(
+    new dlms::profile::WrapperTcpProfileChannel(
+      stream,
+      MakeWrapperTcpChannelOptions(options)));
+}
+
+std::unique_ptr<dlms::association::AssociationClient> CreateAssociation(
+  dlms::profile::IApduChannel& channel,
+  const DlmsClientOptions& options)
+{
+  return std::unique_ptr<dlms::association::AssociationClient>(
+    new dlms::association::AssociationClient(
+      channel,
+      MakeAssociationOptions(options)));
+}
+
 } // namespace
+
+DlmsClient::DlmsClient(const DlmsClientOptions& options)
+  : ownedStream_(CreateTcpStream(options))
+  , ownedChannel_(CreateWrapperChannel(*ownedStream_, options))
+  , ownedAssociation_(CreateAssociation(*ownedChannel_, options))
+  , association_(*ownedAssociation_)
+  , xdlms_(*ownedChannel_, *ownedAssociation_)
+  , state_(ClientState::Disconnected)
+  , constructionStatus_(ValidateDlmsClientOptions(options))
+{
+}
 
 DlmsClient::DlmsClient(
   dlms::profile::IApduChannel& channel,
   dlms::association::AssociationClient& association)
-  : association_(association)
+  : ownedStream_()
+  , ownedChannel_()
+  , ownedAssociation_()
+  , association_(association)
   , xdlms_(channel, association)
   , state_(ClientState::Disconnected)
+  , constructionStatus_(ClientStatus::Ok)
+{
+}
+
+DlmsClient::~DlmsClient()
 {
 }
 
 ClientStatus DlmsClient::Connect()
 {
+  if (constructionStatus_ != ClientStatus::Ok) {
+    return constructionStatus_;
+  }
+
   if (state_ != ClientState::Disconnected) {
     return ClientStatus::Ok;
   }
