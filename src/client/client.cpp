@@ -1,0 +1,234 @@
+#include "dlms/client/client.hpp"
+
+namespace dlms {
+namespace client {
+namespace {
+
+ClientStatus MapAssociationStatus(
+  dlms::association::AssociationStatus status)
+{
+  switch (status) {
+  case dlms::association::AssociationStatus::Ok:
+  case dlms::association::AssociationStatus::AlreadyAssociated:
+    return ClientStatus::Ok;
+  case dlms::association::AssociationStatus::InvalidArgument:
+    return ClientStatus::InvalidArgument;
+  case dlms::association::AssociationStatus::InvalidState:
+    return ClientStatus::InvalidState;
+  case dlms::association::AssociationStatus::ChannelOpenFailed:
+    return ClientStatus::ChannelOpenFailed;
+  case dlms::association::AssociationStatus::SendFailed:
+    return ClientStatus::SendFailed;
+  case dlms::association::AssociationStatus::ReceiveFailed:
+    return ClientStatus::ReceiveFailed;
+  case dlms::association::AssociationStatus::UnsupportedApplicationContext:
+  case dlms::association::AssociationStatus::UnsupportedAuthentication:
+    return ClientStatus::UnsupportedFeature;
+  case dlms::association::AssociationStatus::AssociationRejected:
+  case dlms::association::AssociationStatus::NegotiationFailed:
+  case dlms::association::AssociationStatus::EncodeFailed:
+  case dlms::association::AssociationStatus::DecodeFailed:
+    return ClientStatus::AssociationFailed;
+  case dlms::association::AssociationStatus::ChannelCloseFailed:
+  case dlms::association::AssociationStatus::InternalError:
+    return ClientStatus::InternalError;
+  }
+
+  return ClientStatus::InternalError;
+}
+
+ClientStatus MapXdlmsStatus(dlms::xdlms::XdlmsStatus status)
+{
+  switch (status) {
+  case dlms::xdlms::XdlmsStatus::Ok:
+    return ClientStatus::Ok;
+  case dlms::xdlms::XdlmsStatus::InvalidArgument:
+    return ClientStatus::InvalidArgument;
+  case dlms::xdlms::XdlmsStatus::InvalidState:
+    return ClientStatus::InvalidState;
+  case dlms::xdlms::XdlmsStatus::NotAssociated:
+    return ClientStatus::NotAssociated;
+  case dlms::xdlms::XdlmsStatus::SendFailed:
+    return ClientStatus::SendFailed;
+  case dlms::xdlms::XdlmsStatus::ReceiveFailed:
+    return ClientStatus::ReceiveFailed;
+  case dlms::xdlms::XdlmsStatus::ServiceRejected:
+    return ClientStatus::ServiceRejected;
+  case dlms::xdlms::XdlmsStatus::BlockTransferRequired:
+  case dlms::xdlms::XdlmsStatus::UnsupportedFeature:
+    return ClientStatus::UnsupportedFeature;
+  case dlms::xdlms::XdlmsStatus::EncodeFailed:
+  case dlms::xdlms::XdlmsStatus::DecodeFailed:
+  case dlms::xdlms::XdlmsStatus::InvokeIdMismatch:
+  case dlms::xdlms::XdlmsStatus::InternalError:
+    return ClientStatus::InternalError;
+  }
+
+  return ClientStatus::InternalError;
+}
+
+} // namespace
+
+DlmsClient::DlmsClient(
+  dlms::profile::IApduChannel& channel,
+  dlms::association::AssociationClient& association)
+  : association_(association)
+  , xdlms_(channel, association)
+  , state_(ClientState::Disconnected)
+{
+}
+
+ClientStatus DlmsClient::Connect()
+{
+  if (state_ != ClientState::Disconnected) {
+    return ClientStatus::Ok;
+  }
+
+  const ClientStatus status = MapAssociationStatus(association_.Open());
+  if (status != ClientStatus::Ok) {
+    return status;
+  }
+
+  state_ = ClientState::Connected;
+  return ClientStatus::Ok;
+}
+
+ClientStatus DlmsClient::OpenAssociation()
+{
+  if (state_ == ClientState::Disconnected) {
+    return ClientStatus::InvalidState;
+  }
+
+  if (state_ == ClientState::Associated) {
+    return ClientStatus::Ok;
+  }
+
+  const ClientStatus status = MapAssociationStatus(association_.Establish());
+  if (status != ClientStatus::Ok) {
+    return status;
+  }
+
+  state_ = ClientState::Associated;
+  return ClientStatus::Ok;
+}
+
+ClientStatus DlmsClient::ReleaseAssociation()
+{
+  if (state_ != ClientState::Associated) {
+    return ClientStatus::Ok;
+  }
+
+  const ClientStatus status = MapAssociationStatus(association_.Release());
+  if (status != ClientStatus::Ok) {
+    return status;
+  }
+
+  state_ = ClientState::Disconnected;
+  return ClientStatus::Ok;
+}
+
+ClientStatus DlmsClient::Close()
+{
+  if (state_ == ClientState::Disconnected) {
+    return ClientStatus::Ok;
+  }
+
+  const ClientStatus status = MapAssociationStatus(association_.Close());
+  if (status != ClientStatus::Ok) {
+    return status;
+  }
+
+  state_ = ClientState::Disconnected;
+  return ClientStatus::Ok;
+}
+
+ClientState DlmsClient::State() const
+{
+  return state_;
+}
+
+bool DlmsClient::IsConnected() const
+{
+  return state_ != ClientState::Disconnected;
+}
+
+bool DlmsClient::IsAssociated() const
+{
+  return state_ == ClientState::Associated && association_.IsAssociated();
+}
+
+ClientStatus DlmsClient::Get(
+  const CosemAttributeDescriptor& descriptor,
+  std::vector<std::uint8_t>& encodedData)
+{
+  encodedData.clear();
+  if (state_ != ClientState::Associated) {
+    return ClientStatus::NotAssociated;
+  }
+
+  dlms::xdlms::GetResult result = dlms::xdlms::EmptyGetResult();
+  const ClientStatus status = MapXdlmsStatus(xdlms_.Get(descriptor, result));
+  if (status != ClientStatus::Ok) {
+    return status;
+  }
+
+  encodedData = result.data;
+  return ClientStatus::Ok;
+}
+
+ClientStatus DlmsClient::Set(
+  const CosemAttributeDescriptor& descriptor,
+  const std::vector<std::uint8_t>& encodedData)
+{
+  if (state_ != ClientState::Associated) {
+    return ClientStatus::NotAssociated;
+  }
+
+  dlms::xdlms::SetResult result = dlms::xdlms::EmptySetResult();
+  return MapXdlmsStatus(xdlms_.Set(descriptor, encodedData, result));
+}
+
+ClientStatus DlmsClient::Action(
+  const CosemMethodDescriptor& descriptor,
+  bool hasParameter,
+  const std::vector<std::uint8_t>& encodedParameter,
+  std::vector<std::uint8_t>& encodedReturnParameter)
+{
+  encodedReturnParameter.clear();
+  if (state_ != ClientState::Associated) {
+    return ClientStatus::NotAssociated;
+  }
+
+  dlms::xdlms::ActionResult result = dlms::xdlms::EmptyActionResult();
+  const ClientStatus status =
+    MapXdlmsStatus(xdlms_.Action(
+      descriptor,
+      hasParameter,
+      encodedParameter,
+      result));
+  if (status != ClientStatus::Ok) {
+    return status;
+  }
+
+  if (result.hasData) {
+    encodedReturnParameter = result.data;
+  }
+  return ClientStatus::Ok;
+}
+
+const char* ClientStateName(ClientState state)
+{
+  switch (state) {
+  case ClientState::Disconnected:
+    return "Disconnected";
+  case ClientState::Connected:
+    return "Connected";
+  case ClientState::Associated:
+    return "Associated";
+  }
+
+  return "Unknown";
+}
+
+} // namespace client
+} // namespace dlms

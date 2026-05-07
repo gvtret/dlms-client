@@ -38,19 +38,17 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  Options["DlmsClientOptions"]
   Client["DlmsClient"]
-  ChannelFactory["ProfileChannelFactory"]
-  TransportFactory["TransportFactory"]
+  Channel["IApduChannel"]
   Association["AssociationClient"]
   Services["XdlmsClient"]
 
-  Options --> Client
-  Client --> TransportFactory
-  Client --> ChannelFactory
+  Channel --> Client
+  Association --> Client
   Client --> Association
   Client --> Services
-  ChannelFactory --> TransportFactory
+  Services --> Channel
+  Services --> Association
 ```
 
 ## 5. Class Interaction Diagram
@@ -58,22 +56,20 @@ flowchart LR
 ```mermaid
 classDiagram
   class DlmsClient {
-    -DlmsClientOptions options
     -ClientState state
-    -IByteStream* byteStream
-    -IApduChannel* channel
-    -AssociationClient* association
-    -XdlmsClient* xdlms
+    -AssociationClient& association
+    -XdlmsClient xdlms
+    +DlmsClient(IApduChannel, AssociationClient)
     +Connect() ClientStatus
     +OpenAssociation() ClientStatus
     +ReleaseAssociation() ClientStatus
     +Close() ClientStatus
+    +State() ClientState
     +Get(descriptor, data) ClientStatus
     +Set(descriptor, data) ClientStatus
     +Action(descriptor, hasParameter, parameter, returnData) ClientStatus
   }
 
-  class DlmsClientOptions
   class ClientState {
     <<enumeration>>
     Disconnected
@@ -81,21 +77,12 @@ classDiagram
     Associated
   }
 
-  class TransportFactory {
-    +CreateWrapperTcp(options)
-  }
-
-  class ProfileChannelFactory {
-    +CreateWrapperTcpChannel(stream, options)
-  }
-
+  class IApduChannel
   class AssociationClient
   class XdlmsClient
 
-  DlmsClient --> DlmsClientOptions
   DlmsClient --> ClientState
-  DlmsClient --> TransportFactory
-  DlmsClient --> ProfileChannelFactory
+  DlmsClient --> IApduChannel
   DlmsClient --> AssociationClient
   DlmsClient --> XdlmsClient
 ```
@@ -107,16 +94,17 @@ stateDiagram-v2
   [*] --> Disconnected
   Disconnected --> Connected: Connect ok
   Connected --> Associated: OpenAssociation ok
-  Associated --> Connected: ReleaseAssociation ok
+  Associated --> Disconnected: ReleaseAssociation ok
   Connected --> Disconnected: Close
   Associated --> Disconnected: Close
 ```
 
 ## 7. Error Model
 
-Public runtime calls return `ClientStatus`. Constructors only store options and
-must not open transports. Destructors may close owned resources best-effort but
-must not be the only way to release an association.
+Public runtime calls return `ClientStatus`. The injected-channel phase does not
+own transport construction. Its `ReleaseAssociation()` follows the existing
+`AssociationClient::Release()` contract, which sends RLRQ, receives RLRE, closes
+the channel, and returns the facade to `Disconnected`.
 
 ## 8. Test Strategy
 
