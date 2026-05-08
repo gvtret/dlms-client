@@ -2,7 +2,11 @@
 
 #include "dlms/association/association_types.hpp"
 #include "dlms/profile/profile_types.hpp"
+#include "dlms/security/ciphered_apdu_processor.hpp"
+#include "dlms/security/in_memory_invocation_counter_store.hpp"
+#include "dlms/security/in_memory_key_store.hpp"
 
+#include <cstddef>
 #include <memory>
 
 namespace dlms {
@@ -106,6 +110,36 @@ dlms::association::AssociationOptions MakeAssociationOptions(
   return association;
 }
 
+dlms::security::SecurityKey MakeSecurityKey(
+  dlms::security::SecurityKeyRole role,
+  const std::uint8_t bytes[16])
+{
+  dlms::security::SecurityKey key = dlms::security::EmptySecurityKey(role);
+  key.size = 16u;
+  for (std::size_t i = 0u; i < 16u; ++i) {
+    key.bytes[i] = bytes[i];
+  }
+  return key;
+}
+
+std::unique_ptr<dlms::security::SecurityContext> CreateSecurityContext(
+  const DlmsClientOptions& options)
+{
+  std::unique_ptr<dlms::security::SecurityContext> context(
+    new dlms::security::SecurityContext(
+      dlms::security::EmptySecurityContext()));
+  context->policy =
+    dlms::security::SecurityPolicy::AuthenticatedAndEncrypted;
+  context->role = dlms::security::SecurityRole::Client;
+  context->clientSap = options.clientSap;
+  context->serverSap = options.serverSap;
+  for (std::size_t i = 0u; i < 8u; ++i) {
+    context->localSystemTitle[i] = options.security.clientSystemTitle[i];
+    context->remoteSystemTitle[i] = options.security.serverSystemTitle[i];
+  }
+  return context;
+}
+
 std::unique_ptr<dlms::transport::TcpStreamTransport> CreateTcpStream(
   const DlmsClientOptions& options)
 {
@@ -139,11 +173,56 @@ DlmsClient::DlmsClient(const DlmsClientOptions& options)
   : ownedStream_(CreateTcpStream(options))
   , ownedChannel_(CreateWrapperChannel(*ownedStream_, options))
   , ownedAssociation_(CreateAssociation(*ownedChannel_, options))
+  , ownedSecurityContext_()
+  , ownedKeys_()
+  , ownedCounters_()
+  , ownedSecurity_()
   , association_(*ownedAssociation_)
-  , xdlms_(*ownedChannel_, *ownedAssociation_)
+  , xdlms_()
   , state_(ClientState::Disconnected)
   , constructionStatus_(ValidateDlmsClientOptions(options))
 {
+  if (constructionStatus_ != ClientStatus::Ok ||
+      options.securityMode == ClientSecurityMode::None) {
+    xdlms_.reset(
+      new dlms::xdlms::XdlmsClient(*ownedChannel_, *ownedAssociation_));
+    return;
+  }
+
+  ownedSecurityContext_ = CreateSecurityContext(options);
+  ownedKeys_.reset(new dlms::security::InMemoryKeyStore());
+  ownedCounters_.reset(
+    new dlms::security::InMemoryInvocationCounterStore());
+  ownedCounters_->SetLocalCounter(options.security.invocationCounter);
+
+  const dlms::security::SecurityStatus encryptionKeyStatus =
+    ownedKeys_->SetKey(
+      MakeSecurityKey(
+        dlms::security::SecurityKeyRole::GlobalUnicastEncryption,
+        options.security.globalUnicastEncryptionKey));
+  const dlms::security::SecurityStatus authenticationKeyStatus =
+    ownedKeys_->SetKey(
+      MakeSecurityKey(
+        dlms::security::SecurityKeyRole::Authentication,
+        options.security.authenticationKey));
+  if (encryptionKeyStatus != dlms::security::SecurityStatus::Ok ||
+      authenticationKeyStatus != dlms::security::SecurityStatus::Ok) {
+    constructionStatus_ = ClientStatus::InvalidArgument;
+    xdlms_.reset(
+      new dlms::xdlms::XdlmsClient(*ownedChannel_, *ownedAssociation_));
+    return;
+  }
+
+  ownedSecurity_.reset(
+    new dlms::security::CipheredApduProcessor(
+      *ownedSecurityContext_,
+      *ownedKeys_,
+      *ownedCounters_));
+  xdlms_.reset(
+    new dlms::xdlms::XdlmsClient(
+      *ownedChannel_,
+      *ownedAssociation_,
+      *ownedSecurity_));
 }
 
 DlmsClient::DlmsClient(
@@ -152,8 +231,12 @@ DlmsClient::DlmsClient(
   : ownedStream_()
   , ownedChannel_()
   , ownedAssociation_()
+  , ownedSecurityContext_()
+  , ownedKeys_()
+  , ownedCounters_()
+  , ownedSecurity_()
   , association_(association)
-  , xdlms_(channel, association)
+  , xdlms_(new dlms::xdlms::XdlmsClient(channel, association))
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
 {
@@ -166,8 +249,12 @@ DlmsClient::DlmsClient(
   : ownedStream_()
   , ownedChannel_()
   , ownedAssociation_()
+  , ownedSecurityContext_()
+  , ownedKeys_()
+  , ownedCounters_()
+  , ownedSecurity_()
   , association_(association)
-  , xdlms_(channel, association, security)
+  , xdlms_(new dlms::xdlms::XdlmsClient(channel, association, security))
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
 {
@@ -270,7 +357,7 @@ ClientStatus DlmsClient::Get(
   }
 
   dlms::xdlms::GetResult result = dlms::xdlms::EmptyGetResult();
-  const ClientStatus status = MapXdlmsStatus(xdlms_.Get(descriptor, result));
+  const ClientStatus status = MapXdlmsStatus(xdlms_->Get(descriptor, result));
   if (status != ClientStatus::Ok) {
     return status;
   }
@@ -288,7 +375,7 @@ ClientStatus DlmsClient::Set(
   }
 
   dlms::xdlms::SetResult result = dlms::xdlms::EmptySetResult();
-  return MapXdlmsStatus(xdlms_.Set(descriptor, encodedData, result));
+  return MapXdlmsStatus(xdlms_->Set(descriptor, encodedData, result));
 }
 
 ClientStatus DlmsClient::Action(
@@ -304,7 +391,7 @@ ClientStatus DlmsClient::Action(
 
   dlms::xdlms::ActionResult result = dlms::xdlms::EmptyActionResult();
   const ClientStatus status =
-    MapXdlmsStatus(xdlms_.Action(
+    MapXdlmsStatus(xdlms_->Action(
       descriptor,
       hasParameter,
       encodedParameter,

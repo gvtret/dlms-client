@@ -14,7 +14,17 @@ enum class ClientProfile
 
 enum class ClientSecurityMode
 {
-  None
+  None,
+  AuthenticatedAndEncrypted
+};
+
+struct ClientSecurityOptions
+{
+  std::uint8_t clientSystemTitle[8];
+  std::uint8_t serverSystemTitle[8];
+  std::uint8_t globalUnicastEncryptionKey[16];
+  std::uint8_t authenticationKey[16];
+  std::uint32_t invocationCounter;
 };
 
 struct WrapperTcpEndpoint
@@ -30,6 +40,7 @@ struct DlmsClientOptions
   ClientProfile profile;
   ClientSecurityMode securityMode;
   WrapperTcpEndpoint wrapperTcp;
+  ClientSecurityOptions security;
   std::uint16_t clientSap;
   std::uint16_t serverSap;
   std::uint32_t connectTimeoutMs;

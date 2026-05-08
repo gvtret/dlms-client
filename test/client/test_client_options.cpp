@@ -4,6 +4,29 @@
 
 #include <gtest/gtest.h>
 
+namespace {
+
+void FillSecurityOptions(dlms::client::DlmsClientOptions& options)
+{
+  options.securityMode =
+    dlms::client::ClientSecurityMode::AuthenticatedAndEncrypted;
+  options.security.invocationCounter = 1u;
+  for (std::size_t i = 0u; i < 8u; ++i) {
+    options.security.clientSystemTitle[i] =
+      static_cast<std::uint8_t>(0x10u + i);
+    options.security.serverSystemTitle[i] =
+      static_cast<std::uint8_t>(0x20u + i);
+  }
+  for (std::size_t i = 0u; i < 16u; ++i) {
+    options.security.globalUnicastEncryptionKey[i] =
+      static_cast<std::uint8_t>(0x30u + i);
+    options.security.authenticationKey[i] =
+      static_cast<std::uint8_t>(0x80u + i);
+  }
+}
+
+} // namespace
+
 TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
 {
   const dlms::client::DlmsClientOptions options =
@@ -19,6 +42,15 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
   EXPECT_EQ(1u, options.serverSap);
   EXPECT_EQ(5000u, options.connectTimeoutMs);
   EXPECT_EQ(5000u, options.requestTimeoutMs);
+  EXPECT_EQ(0u, options.security.invocationCounter);
+  for (std::size_t i = 0u; i < 8u; ++i) {
+    EXPECT_EQ(0u, options.security.clientSystemTitle[i]);
+    EXPECT_EQ(0u, options.security.serverSystemTitle[i]);
+  }
+  for (std::size_t i = 0u; i < 16u; ++i) {
+    EXPECT_EQ(0u, options.security.globalUnicastEncryptionKey[i]);
+    EXPECT_EQ(0u, options.security.authenticationKey[i]);
+  }
   EXPECT_EQ(dlms::client::ClientStatus::Ok,
             dlms::client::ValidateDlmsClientOptions(options));
 }
@@ -44,6 +76,21 @@ TEST(ClientOptions, RejectsInvalidEndpointAndSapValues)
 
   options = dlms::client::DefaultDlmsClientOptions();
   options.clientSap = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+}
+
+TEST(ClientOptions, ValidatesAuthenticatedEncryptedSecurityOptions)
+{
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  FillSecurityOptions(options);
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.securityMode =
+    dlms::client::ClientSecurityMode::AuthenticatedAndEncrypted;
   EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
             dlms::client::ValidateDlmsClientOptions(options));
 }

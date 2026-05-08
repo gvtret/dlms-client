@@ -16,6 +16,9 @@
 namespace dlms {
 namespace security {
 class CipheredApduProcessor;
+class InMemoryInvocationCounterStore;
+class InMemoryKeyStore;
+struct SecurityContext;
 }
 namespace client {
 
@@ -75,8 +78,13 @@ private:
   std::unique_ptr<dlms::transport::TcpStreamTransport> ownedStream_;
   std::unique_ptr<dlms::profile::WrapperTcpProfileChannel> ownedChannel_;
   std::unique_ptr<dlms::association::AssociationClient> ownedAssociation_;
+  std::unique_ptr<dlms::security::SecurityContext> ownedSecurityContext_;
+  std::unique_ptr<dlms::security::InMemoryKeyStore> ownedKeys_;
+  std::unique_ptr<dlms::security::InMemoryInvocationCounterStore>
+    ownedCounters_;
+  std::unique_ptr<dlms::security::CipheredApduProcessor> ownedSecurity_;
   dlms::association::AssociationClient& association_;
-  dlms::xdlms::XdlmsClient xdlms_;
+  std::unique_ptr<dlms::xdlms::XdlmsClient> xdlms_;
   ClientState state_;
   ClientStatus constructionStatus_;
 };

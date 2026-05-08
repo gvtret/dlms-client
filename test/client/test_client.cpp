@@ -238,6 +238,25 @@ void EstablishFacade(dlms::client::DlmsClient& client,
   ASSERT_EQ(dlms::client::ClientStatus::Ok, client.OpenAssociation());
 }
 
+void FillClientSecurityOptions(dlms::client::DlmsClientOptions& options)
+{
+  options.securityMode =
+    dlms::client::ClientSecurityMode::AuthenticatedAndEncrypted;
+  options.security.invocationCounter = 1u;
+  for (std::size_t i = 0u; i < 8u; ++i) {
+    options.security.clientSystemTitle[i] =
+      static_cast<std::uint8_t>(0x10u + i);
+    options.security.serverSystemTitle[i] =
+      static_cast<std::uint8_t>(0x20u + i);
+  }
+  for (std::size_t i = 0u; i < 16u; ++i) {
+    options.security.globalUnicastEncryptionKey[i] =
+      static_cast<std::uint8_t>(0x30u + i);
+    options.security.authenticationKey[i] =
+      static_cast<std::uint8_t>(0x80u + i);
+  }
+}
+
 } // namespace
 
 TEST(DlmsClient, StartsDisconnectedAndConnectsChannel)
@@ -261,6 +280,19 @@ TEST(DlmsClient, OptionsConstructorStartsDisconnected)
 {
   const dlms::client::DlmsClientOptions options =
     dlms::client::DefaultDlmsClientOptions();
+  dlms::client::DlmsClient client(options);
+
+  EXPECT_EQ(dlms::client::ClientState::Disconnected, client.State());
+  EXPECT_FALSE(client.IsConnected());
+  EXPECT_FALSE(client.IsAssociated());
+}
+
+TEST(DlmsClient, OptionsConstructorAcceptsSecurityComposition)
+{
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  FillClientSecurityOptions(options);
+
   dlms::client::DlmsClient client(options);
 
   EXPECT_EQ(dlms::client::ClientState::Disconnected, client.State());
