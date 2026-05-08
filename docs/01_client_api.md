@@ -19,6 +19,7 @@ enum class ClientStatus
   SendFailed,
   ReceiveFailed,
   ServiceRejected,
+  SecurityFailed,
   UnsupportedFeature,
   InternalError
 };
@@ -37,7 +38,17 @@ enum class ClientProfile
 
 enum class ClientSecurityMode
 {
-  None
+  None,
+  AuthenticatedAndEncrypted
+};
+
+struct ClientSecurityOptions
+{
+  std::uint8_t clientSystemTitle[8];
+  std::uint8_t serverSystemTitle[8];
+  std::uint8_t globalUnicastEncryptionKey[16];
+  std::uint8_t authenticationKey[16];
+  std::uint32_t invocationCounter;
 };
 
 struct WrapperTcpEndpoint
@@ -53,6 +64,7 @@ struct DlmsClientOptions
   ClientProfile profile;
   ClientSecurityMode securityMode;
   WrapperTcpEndpoint wrapperTcp;
+  ClientSecurityOptions security;
   std::uint16_t clientSap;
   std::uint16_t serverSap;
   std::uint32_t connectTimeoutMs;
@@ -86,6 +98,11 @@ public:
     dlms::profile::IApduChannel& channel,
     dlms::association::AssociationClient& association);
 
+  DlmsClient(
+    dlms::profile::IApduChannel& channel,
+    dlms::association::AssociationClient& association,
+    dlms::security::CipheredApduProcessor& security);
+
   ClientStatus Connect();
   ClientStatus OpenAssociation();
   ClientStatus ReleaseAssociation();
@@ -114,9 +131,12 @@ public:
 ## 5. Lifecycle Rules
 
 - The options constructor owns a Wrapper/TCP byte stream, Wrapper/TCP APDU
-  channel, association client, and xDLMS service client.
+  channel, association client, xDLMS service client, and optional security
+  stores/processor.
 - The injected constructor receives an already constructed APDU channel and
   association client for deterministic tests or external composition.
+- The injected security constructor also receives an already constructed
+  `CipheredApduProcessor`.
 - `Connect()` opens the APDU channel through `AssociationClient`.
 - `OpenAssociation()` requires a connected channel.
 - `Get()`, `Set()`, and `Action()` require an established association.
@@ -136,4 +156,21 @@ public:
 | xDLMS send failure | `SendFailed` |
 | xDLMS receive failure | `ReceiveFailed` |
 | xDLMS service rejection | `ServiceRejected` |
+| xDLMS security failure | `SecurityFailed` |
 | unsupported lower-layer feature | `UnsupportedFeature` |
+
+## 7. Security Option Rules
+
+`ClientSecurityMode::None` ignores `ClientSecurityOptions`.
+
+`ClientSecurityMode::AuthenticatedAndEncrypted` requires:
+
+- valid non-zero client and server system titles;
+- 16-byte global unicast encryption key;
+- 16-byte authentication key;
+- a configured invocation counter start value.
+
+The facade maps these fields into a `dlms::security::SecurityContext`,
+`InMemoryKeyStore`, `InMemoryInvocationCounterStore`, and
+`CipheredApduProcessor`. It does not own persistent key storage and does not
+derive LLS/HLS authentication material.

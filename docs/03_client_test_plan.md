@@ -9,6 +9,7 @@ Status and options:
   name association context;
 - invalid options reject empty host, zero port, and unsupported profile/security
   combinations.
+- security options validate system titles and key sizes for protected mode.
 
 Lifecycle:
 
@@ -29,6 +30,15 @@ Service forwarding:
 - `Set()` forwards descriptor and encoded data;
 - `Action()` forwards method descriptor and optional parameter;
 - lower-layer service rejection maps to `ClientStatus::ServiceRejected`.
+- lower-layer security failure maps to `ClientStatus::SecurityFailed`.
+
+Security composition:
+
+- default options keep `ClientSecurityMode::None`;
+- protected options construct key and invocation counter stores;
+- injected security constructor forwards protected GET through `XdlmsClient`;
+- authenticated response failure maps to `SecurityFailed`;
+- no-security service tests remain unchanged.
 
 Failure mapping:
 
@@ -49,14 +59,18 @@ Root integration should cover:
 - public client ACTION over the same path;
 - future live-meter smoke test against configurable endpoint, disabled by
   default.
+- protected public client GET over a fake Wrapper/TCP channel once the matching
+  server security composition is available.
 
 ## 3. Manual Acceptance
 
 Manual tests may use a real Wrapper endpoint with:
 
 - client 16, no security;
-- client 32, LLS;
-- client 48, HLS.
+- client 32, LLS password with protected APDUs when association support is
+  added;
+- client 48, HLS HighPassword with protected APDUs when association support is
+  added.
 
-Only client 16 is in the no-security MVP. LLS/HLS stay pending until
-`dlms-security` is implemented.
+Client 16 remains the first live-meter smoke path. Client 32 and 48 require
+association authentication work before they become automated acceptance tests.

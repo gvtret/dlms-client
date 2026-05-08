@@ -92,3 +92,50 @@ Commit message:
 ```text
 test: cover public client set action integration
 ```
+
+## Phase 6. Security Options Documentation
+
+Deliverables:
+
+- public security option requirements;
+- API contract for `ClientSecurityMode::AuthenticatedAndEncrypted`;
+- architecture sequence for client/security/xDLMS composition;
+- status mapping and test plan for security failures.
+
+Commit message:
+
+```text
+docs(client): define security options
+```
+
+## Phase 7. Injected Security Facade
+
+Deliverables:
+
+- injected constructor accepting `CipheredApduProcessor`;
+- `ClientStatus::SecurityFailed`;
+- xDLMS security failure mapping;
+- focused tests for protected GET and authentication failure using injected
+  channel composition.
+
+Commit message:
+
+```text
+feat(client): add injected security facade
+```
+
+## Phase 8. Options-Owned Security Composition
+
+Deliverables:
+
+- `ClientSecurityOptions`;
+- validation for protected mode;
+- options constructor ownership of key store, counter store, security context,
+  and ciphered APDU processor;
+- tests proving options-owned protected client construction.
+
+Commit message:
+
+```text
+feat(client): compose security options
+```
