@@ -59,6 +59,8 @@ ClientStatus MapXdlmsStatus(dlms::xdlms::XdlmsStatus status)
     return ClientStatus::ReceiveFailed;
   case dlms::xdlms::XdlmsStatus::ServiceRejected:
     return ClientStatus::ServiceRejected;
+  case dlms::xdlms::XdlmsStatus::SecurityFailed:
+    return ClientStatus::SecurityFailed;
   case dlms::xdlms::XdlmsStatus::BlockTransferRequired:
   case dlms::xdlms::XdlmsStatus::UnsupportedFeature:
     return ClientStatus::UnsupportedFeature;
@@ -152,6 +154,20 @@ DlmsClient::DlmsClient(
   , ownedAssociation_()
   , association_(association)
   , xdlms_(channel, association)
+  , state_(ClientState::Disconnected)
+  , constructionStatus_(ClientStatus::Ok)
+{
+}
+
+DlmsClient::DlmsClient(
+  dlms::profile::IApduChannel& channel,
+  dlms::association::AssociationClient& association,
+  dlms::security::CipheredApduProcessor& security)
+  : ownedStream_()
+  , ownedChannel_()
+  , ownedAssociation_()
+  , association_(association)
+  , xdlms_(channel, association, security)
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
 {

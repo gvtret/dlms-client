@@ -15,6 +15,7 @@ enum class ClientStatus
   SendFailed,
   ReceiveFailed,
   ServiceRejected,
+  SecurityFailed,
   UnsupportedFeature,
   InternalError
 };

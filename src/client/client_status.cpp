@@ -26,6 +26,8 @@ const char* ClientStatusName(ClientStatus status)
     return "ReceiveFailed";
   case ClientStatus::ServiceRejected:
     return "ServiceRejected";
+  case ClientStatus::SecurityFailed:
+    return "SecurityFailed";
   case ClientStatus::UnsupportedFeature:
     return "UnsupportedFeature";
   case ClientStatus::InternalError:

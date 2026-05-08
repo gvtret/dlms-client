@@ -14,6 +14,9 @@
 #include <vector>
 
 namespace dlms {
+namespace security {
+class CipheredApduProcessor;
+}
 namespace client {
 
 enum class ClientState
@@ -34,6 +37,11 @@ public:
   DlmsClient(
     dlms::profile::IApduChannel& channel,
     dlms::association::AssociationClient& association);
+
+  DlmsClient(
+    dlms::profile::IApduChannel& channel,
+    dlms::association::AssociationClient& association,
+    dlms::security::CipheredApduProcessor& security);
 
   ~DlmsClient();
 

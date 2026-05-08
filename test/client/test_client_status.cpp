@@ -19,6 +19,10 @@ TEST(ClientStatus, NamesStableValues)
     dlms::client::ClientStatusName(
       dlms::client::ClientStatus::UnsupportedFeature));
   EXPECT_STREQ(
+    "SecurityFailed",
+    dlms::client::ClientStatusName(
+      dlms::client::ClientStatus::SecurityFailed));
+  EXPECT_STREQ(
     "Unknown",
     dlms::client::ClientStatusName(
       static_cast<dlms::client::ClientStatus>(255)));

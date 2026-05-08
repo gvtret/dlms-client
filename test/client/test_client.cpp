@@ -5,6 +5,9 @@
 #include "dlms/apdu/xdlms.hpp"
 #include "dlms/association/association_client.hpp"
 #include "dlms/profile/apdu_channel.hpp"
+#include "dlms/security/ciphered_apdu_processor.hpp"
+#include "dlms/security/in_memory_invocation_counter_store.hpp"
+#include "dlms/security/in_memory_key_store.hpp"
 
 #include <gtest/gtest.h>
 
@@ -148,6 +151,72 @@ std::vector<std::uint8_t> EncodeResponse(
   EXPECT_EQ(dlms::apdu::ApduStatus::Ok,
             dlms::apdu::EncodeXdlmsApdu(response, output));
   return output;
+}
+
+dlms::security::SecurityByteView ViewOf(
+  const std::vector<std::uint8_t>& data)
+{
+  dlms::security::SecurityByteView view;
+  view.data = data.empty() ? 0 : &data[0];
+  view.size = data.size();
+  return view;
+}
+
+dlms::security::SecurityKey MakeKey(
+  dlms::security::SecurityKeyRole role,
+  std::uint8_t seed)
+{
+  dlms::security::SecurityKey key = dlms::security::EmptySecurityKey(role);
+  key.size = 16u;
+  for (std::size_t i = 0u; i < key.size; ++i) {
+    key.bytes[i] = static_cast<std::uint8_t>(seed + i);
+  }
+  return key;
+}
+
+void InstallKeys(dlms::security::InMemoryKeyStore& keys)
+{
+  ASSERT_EQ(
+    dlms::security::SecurityStatus::Ok,
+    keys.SetKey(
+      MakeKey(
+        dlms::security::SecurityKeyRole::GlobalUnicastEncryption,
+        0x10u)));
+  ASSERT_EQ(
+    dlms::security::SecurityStatus::Ok,
+    keys.SetKey(
+      MakeKey(
+        dlms::security::SecurityKeyRole::Authentication,
+        0x80u)));
+}
+
+dlms::security::SecurityContext MakeSecurityContext(
+  dlms::security::SecurityRole role)
+{
+  dlms::security::SecurityContext context =
+    dlms::security::EmptySecurityContext();
+  context.policy = dlms::security::SecurityPolicy::AuthenticatedAndEncrypted;
+  context.role = role;
+  context.clientSap = 16u;
+  context.serverSap = 1u;
+
+  const std::uint8_t clientTitle[8] =
+    {0x4du, 0x4du, 0x4du, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u};
+  const std::uint8_t serverTitle[8] =
+    {0x4du, 0x45u, 0x54u, 0x00u, 0x00u, 0x00u, 0x00u, 0x02u};
+
+  for (std::size_t i = 0u; i < 8u; ++i) {
+    context.localSystemTitle[i] =
+      role == dlms::security::SecurityRole::Client
+        ? clientTitle[i]
+        : serverTitle[i];
+    context.remoteSystemTitle[i] =
+      role == dlms::security::SecurityRole::Client
+        ? serverTitle[i]
+        : clientTitle[i];
+  }
+
+  return context;
 }
 
 std::vector<std::uint8_t> MakeGetResponse(std::uint8_t invokeIdAndPriority)
@@ -304,4 +373,82 @@ TEST(DlmsClient, GetForwardsToXdlmsClient)
   EXPECT_EQ(dlms::client::ClientStatus::Ok,
             client.Get(MakeDescriptor(), output));
   EXPECT_EQ(MakeLongUnsignedBytes(0x2468u), output);
+}
+
+TEST(DlmsClient, InjectedSecurityProtectsGetRequest)
+{
+  dlms::security::InMemoryKeyStore keys;
+  InstallKeys(keys);
+
+  dlms::security::InMemoryInvocationCounterStore clientCounters;
+  dlms::security::InMemoryInvocationCounterStore serverCounters;
+  clientCounters.SetLocalCounter(1u);
+  serverCounters.SetLocalCounter(1u);
+
+  dlms::security::CipheredApduProcessor clientSecurity(
+    MakeSecurityContext(dlms::security::SecurityRole::Client),
+    keys,
+    clientCounters);
+  dlms::security::CipheredApduProcessor serverSecurity(
+    MakeSecurityContext(dlms::security::SecurityRole::Server),
+    keys,
+    serverCounters);
+
+  FakeApduChannel channel;
+  dlms::association::AssociationClient association(
+    channel,
+    dlms::association::DefaultAssociationOptions());
+  dlms::client::DlmsClient client(channel, association, clientSecurity);
+  EstablishFacade(client, channel);
+
+  ASSERT_EQ(
+    dlms::security::SecurityStatus::Ok,
+    serverSecurity.Protect(ViewOf(MakeGetResponse(0x81u)),
+                           channel.nextReceive));
+
+  std::vector<std::uint8_t> output;
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            client.Get(MakeDescriptor(), output));
+  EXPECT_EQ(MakeLongUnsignedBytes(0x2468u), output);
+
+  ASSERT_FALSE(channel.sent.empty());
+  EXPECT_EQ(0x30u, channel.sent[0]);
+
+  std::vector<std::uint8_t> plainRequest;
+  ASSERT_EQ(
+    dlms::security::SecurityStatus::Ok,
+    serverSecurity.Unprotect(ViewOf(channel.sent), plainRequest));
+
+  dlms::apdu::XdlmsApdu request;
+  ASSERT_EQ(dlms::apdu::ApduStatus::Ok,
+            dlms::apdu::DecodeXdlmsApdu(
+              &plainRequest[0],
+              plainRequest.size(),
+              request));
+  EXPECT_EQ(dlms::apdu::XdlmsApduKind::GetRequest, request.kind);
+}
+
+TEST(DlmsClient, MapsInjectedSecurityFailure)
+{
+  dlms::security::InMemoryKeyStore keys;
+  InstallKeys(keys);
+  dlms::security::InMemoryInvocationCounterStore counters;
+  counters.SetLocalCounter(1u);
+  dlms::security::CipheredApduProcessor security(
+    MakeSecurityContext(dlms::security::SecurityRole::Client),
+    keys,
+    counters);
+
+  FakeApduChannel channel;
+  dlms::association::AssociationClient association(
+    channel,
+    dlms::association::DefaultAssociationOptions());
+  dlms::client::DlmsClient client(channel, association, security);
+  EstablishFacade(client, channel);
+  channel.nextReceive = MakeGetResponse(0x81u);
+
+  std::vector<std::uint8_t> output;
+  EXPECT_EQ(dlms::client::ClientStatus::SecurityFailed,
+            client.Get(MakeDescriptor(), output));
+  EXPECT_TRUE(output.empty());
 }
