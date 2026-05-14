@@ -35,6 +35,8 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.requestTimeoutMs = 5000u;
   options.lowLevelSecurity.credential = 0;
   options.lowLevelSecurity.credentialSize = 0u;
+  options.highLevelSecurity.password = 0;
+  options.highLevelSecurity.passwordSize = 0u;
   options.security.invocationCounter = 0u;
   for (std::size_t i = 0u; i < 8u; ++i) {
     options.security.clientSystemTitle[i] = 0u;
@@ -57,6 +59,8 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
       options.authenticationMode !=
         ClientAuthenticationMode::LowLevelSecurity &&
       options.authenticationMode !=
+        ClientAuthenticationMode::HighLevelSecurity &&
+      options.authenticationMode !=
         ClientAuthenticationMode::HighLevelSecurityGmac) {
     return ClientStatus::UnsupportedFeature;
   }
@@ -71,6 +75,15 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
     if (options.lowLevelSecurity.credential == 0 ||
         options.lowLevelSecurity.credentialSize == 0u ||
         options.lowLevelSecurity.credentialSize > 125u) {
+      return ClientStatus::InvalidArgument;
+    }
+  }
+
+  if (options.authenticationMode ==
+      ClientAuthenticationMode::HighLevelSecurity) {
+    if (options.highLevelSecurity.password == 0 ||
+        options.highLevelSecurity.passwordSize == 0u ||
+        options.highLevelSecurity.passwordSize > 125u) {
       return ClientStatus::InvalidArgument;
     }
   }

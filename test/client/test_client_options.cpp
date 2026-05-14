@@ -46,6 +46,8 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
   EXPECT_EQ(5000u, options.requestTimeoutMs);
   EXPECT_EQ(nullptr, options.lowLevelSecurity.credential);
   EXPECT_EQ(0u, options.lowLevelSecurity.credentialSize);
+  EXPECT_EQ(nullptr, options.highLevelSecurity.password);
+  EXPECT_EQ(0u, options.highLevelSecurity.passwordSize);
   EXPECT_EQ(0u, options.security.invocationCounter);
   for (std::size_t i = 0u; i < 8u; ++i) {
     EXPECT_EQ(0u, options.security.clientSystemTitle[i]);
@@ -90,6 +92,34 @@ TEST(ClientOptions, ValidatesLowLevelSecurityCredential)
     dlms::client::ClientAuthenticationMode::LowLevelSecurity;
   options.lowLevelSecurity.credential = credential;
   options.lowLevelSecurity.credentialSize = 126u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+}
+
+TEST(ClientOptions, ValidatesHighLevelSecurityPassword)
+{
+  const std::uint8_t password[] =
+    {'H', 'i', 'P', 'a', 's', 's', 'w', 'o', 'r', 'd'};
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::HighLevelSecurity;
+  options.highLevelSecurity.password = password;
+  options.highLevelSecurity.passwordSize = sizeof(password);
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::HighLevelSecurity;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::HighLevelSecurity;
+  options.highLevelSecurity.password = password;
+  options.highLevelSecurity.passwordSize = 126u;
   EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
             dlms::client::ValidateDlmsClientOptions(options));
 }

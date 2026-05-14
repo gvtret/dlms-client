@@ -23,6 +23,7 @@ enum class ClientAuthenticationMode
 {
   None,
   LowLevelSecurity,
+  HighLevelSecurity,
   HighLevelSecurityGmac
 };
 
@@ -30,6 +31,12 @@ struct ClientLowLevelSecurityOptions
 {
   const std::uint8_t* credential;
   std::size_t credentialSize;
+};
+
+struct ClientHighLevelSecurityOptions
+{
+  const std::uint8_t* password;
+  std::size_t passwordSize;
 };
 
 struct ClientSecurityOptions
@@ -56,6 +63,7 @@ struct DlmsClientOptions
   ClientSecurityMode securityMode;
   WrapperTcpEndpoint wrapperTcp;
   ClientLowLevelSecurityOptions lowLevelSecurity;
+  ClientHighLevelSecurityOptions highLevelSecurity;
   ClientSecurityOptions security;
   std::uint16_t clientSap;
   std::uint16_t serverSap;

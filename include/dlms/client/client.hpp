@@ -16,6 +16,7 @@
 namespace dlms {
 namespace security {
 class CipheredApduProcessor;
+class HlsHighAuthenticator;
 class HlsGmacAuthenticator;
 class InMemoryInvocationCounterStore;
 class InMemoryKeyStore;
@@ -24,7 +25,7 @@ struct SecurityContext;
 }
 namespace client {
 
-class ClientHlsGmacAssociationStrategy;
+class ClientHlsAssociationStrategy;
 
 enum class ClientState
 {
@@ -86,15 +87,16 @@ private:
   std::unique_ptr<dlms::security::InMemoryInvocationCounterStore>
     ownedCounters_;
   std::unique_ptr<dlms::security::IRandomSource> ownedRandom_;
-  std::unique_ptr<dlms::security::HlsGmacAuthenticator> ownedHls_;
-  std::unique_ptr<ClientHlsGmacAssociationStrategy> ownedHlsStrategy_;
+  std::unique_ptr<dlms::security::HlsHighAuthenticator> ownedHlsHigh_;
+  std::unique_ptr<dlms::security::HlsGmacAuthenticator> ownedHlsGmac_;
+  std::unique_ptr<ClientHlsAssociationStrategy> ownedHlsStrategy_;
   std::unique_ptr<dlms::association::AssociationClient> ownedAssociation_;
   std::unique_ptr<dlms::security::CipheredApduProcessor> ownedSecurity_;
   dlms::association::AssociationClient& association_;
   std::unique_ptr<dlms::xdlms::XdlmsClient> xdlms_;
   ClientState state_;
   ClientStatus constructionStatus_;
-  bool hlsGmacAuthentication_;
+  bool hlsAuthentication_;
 };
 
 const char* ClientStateName(ClientState state);

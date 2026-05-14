@@ -4,6 +4,7 @@
 #include "dlms/association/association_types.hpp"
 #include "dlms/profile/profile_types.hpp"
 #include "dlms/security/ciphered_apdu_processor.hpp"
+#include "dlms/security/hls_high_authenticator.hpp"
 #include "dlms/security/hls_gmac_authenticator.hpp"
 #include "dlms/security/in_memory_invocation_counter_store.hpp"
 #include "dlms/security/in_memory_key_store.hpp"
@@ -150,6 +151,11 @@ dlms::association::AssociationOptions MakeAssociationOptions(
           options.lowLevelSecurity.credentialSize);
     }
   } else if (options.authenticationMode ==
+             ClientAuthenticationMode::HighLevelSecurity) {
+    association.authenticationMode =
+      dlms::association::AuthenticationMode::HighLevelSecurity;
+    association.highLevelSecurity = hlsStrategy;
+  } else if (options.authenticationMode ==
              ClientAuthenticationMode::HighLevelSecurityGmac) {
     association.authenticationMode =
       dlms::association::AuthenticationMode::HighLevelSecurity;
@@ -242,11 +248,31 @@ std::unique_ptr<dlms::security::IRandomSource> CreateRandomSource(
   const DlmsClientOptions& options)
 {
   if (options.authenticationMode !=
+        ClientAuthenticationMode::HighLevelSecurity &&
+      options.authenticationMode !=
       ClientAuthenticationMode::HighLevelSecurityGmac) {
     return std::unique_ptr<dlms::security::IRandomSource>();
   }
   return std::unique_ptr<dlms::security::IRandomSource>(
     new OpenSslRandomSource());
+}
+
+std::unique_ptr<dlms::security::HlsHighAuthenticator>
+CreateHlsHighAuthenticator(
+  const DlmsClientOptions& options,
+  dlms::security::IRandomSource* random)
+{
+  if (options.authenticationMode !=
+      ClientAuthenticationMode::HighLevelSecurity ||
+      random == 0) {
+    return std::unique_ptr<dlms::security::HlsHighAuthenticator>();
+  }
+
+  dlms::security::SecurityByteView password;
+  password.data = options.highLevelSecurity.password;
+  password.size = options.highLevelSecurity.passwordSize;
+  return std::unique_ptr<dlms::security::HlsHighAuthenticator>(
+    new dlms::security::HlsHighAuthenticator(password, *random));
 }
 
 std::unique_ptr<dlms::security::HlsGmacAuthenticator> CreateHlsAuthenticator(
@@ -292,8 +318,71 @@ std::unique_ptr<dlms::profile::WrapperTcpProfileChannel> CreateWrapperChannel(
 
 } // namespace
 
-class ClientHlsGmacAssociationStrategy
+class ClientHlsAssociationStrategy
   : public dlms::association::IHighLevelSecurityStrategy
+{
+public:
+  const std::vector<std::uint8_t>& ClientChallenge() const
+  {
+    return clientChallenge_;
+  }
+
+  virtual dlms::security::SecurityStatus BuildResponse(
+    dlms::security::SecurityByteView challenge,
+    std::vector<std::uint8_t>& response) const = 0;
+
+  virtual dlms::security::SecurityStatus VerifyResponse(
+    dlms::security::SecurityByteView challenge,
+    dlms::security::SecurityByteView response) const = 0;
+
+protected:
+  mutable std::vector<std::uint8_t> clientChallenge_;
+};
+
+class ClientHlsHighAssociationStrategy : public ClientHlsAssociationStrategy
+{
+public:
+  explicit ClientHlsHighAssociationStrategy(
+    dlms::security::HlsHighAuthenticator& hls)
+    : hls_(hls)
+  {
+  }
+
+  dlms::association::HighLevelSecurityMechanism Mechanism() const override
+  {
+    return dlms::association::HighLevelSecurityMechanism::HlsHigh;
+  }
+
+  dlms::association::AssociationStatus BuildInitialChallenge(
+    std::vector<std::uint8_t>& output) const override
+  {
+    output.clear();
+    if (hls_.BuildChallenge(output) != dlms::security::SecurityStatus::Ok) {
+      return dlms::association::AssociationStatus::UnsupportedAuthentication;
+    }
+    clientChallenge_ = output;
+    return dlms::association::AssociationStatus::Ok;
+  }
+
+  dlms::security::SecurityStatus BuildResponse(
+    dlms::security::SecurityByteView challenge,
+    std::vector<std::uint8_t>& response) const override
+  {
+    return hls_.BuildResponse(challenge, response);
+  }
+
+  dlms::security::SecurityStatus VerifyResponse(
+    dlms::security::SecurityByteView challenge,
+    dlms::security::SecurityByteView response) const override
+  {
+    return hls_.VerifyResponse(challenge, response);
+  }
+
+private:
+  dlms::security::HlsHighAuthenticator& hls_;
+};
+
+class ClientHlsGmacAssociationStrategy : public ClientHlsAssociationStrategy
 {
 public:
   explicit ClientHlsGmacAssociationStrategy(
@@ -318,30 +407,50 @@ public:
     return dlms::association::AssociationStatus::Ok;
   }
 
-  const std::vector<std::uint8_t>& ClientChallenge() const
+  dlms::security::SecurityStatus BuildResponse(
+    dlms::security::SecurityByteView challenge,
+    std::vector<std::uint8_t>& response) const override
   {
-    return clientChallenge_;
+    return hls_.BuildResponse(challenge, response);
+  }
+
+  dlms::security::SecurityStatus VerifyResponse(
+    dlms::security::SecurityByteView challenge,
+    dlms::security::SecurityByteView response) const override
+  {
+    return hls_.VerifyResponse(challenge, response);
   }
 
 private:
   dlms::security::HlsGmacAuthenticator& hls_;
-  mutable std::vector<std::uint8_t> clientChallenge_;
 };
 
 namespace {
 
-std::unique_ptr<ClientHlsGmacAssociationStrategy> CreateHlsStrategy(
+std::unique_ptr<ClientHlsAssociationStrategy> CreateHlsStrategy(
   const DlmsClientOptions& options,
+  dlms::security::HlsHighAuthenticator* hlsHigh,
   dlms::security::HlsGmacAuthenticator* hls)
 {
-  if (options.authenticationMode !=
-      ClientAuthenticationMode::HighLevelSecurityGmac ||
-      hls == 0) {
-    return std::unique_ptr<ClientHlsGmacAssociationStrategy>();
+  if (options.authenticationMode ==
+      ClientAuthenticationMode::HighLevelSecurity) {
+    if (hlsHigh == 0) {
+      return std::unique_ptr<ClientHlsAssociationStrategy>();
+    }
+    return std::unique_ptr<ClientHlsAssociationStrategy>(
+      new ClientHlsHighAssociationStrategy(*hlsHigh));
   }
 
-  return std::unique_ptr<ClientHlsGmacAssociationStrategy>(
-    new ClientHlsGmacAssociationStrategy(*hls));
+  if (options.authenticationMode ==
+      ClientAuthenticationMode::HighLevelSecurityGmac) {
+    if (hls == 0) {
+      return std::unique_ptr<ClientHlsAssociationStrategy>();
+    }
+    return std::unique_ptr<ClientHlsAssociationStrategy>(
+      new ClientHlsGmacAssociationStrategy(*hls));
+  }
+
+  return std::unique_ptr<ClientHlsAssociationStrategy>();
 }
 
 std::unique_ptr<dlms::association::AssociationClient> CreateAssociation(
@@ -419,14 +528,22 @@ DlmsClient::DlmsClient(const DlmsClientOptions& options)
   , ownedKeys_(CreateKeyStore(options))
   , ownedCounters_(CreateCounterStore(options))
   , ownedRandom_(CreateRandomSource(options))
-  , ownedHls_(
+  , ownedHlsHigh_(
+      CreateHlsHighAuthenticator(
+        options,
+        ownedRandom_.get()))
+  , ownedHlsGmac_(
       CreateHlsAuthenticator(
         options,
         ownedSecurityContext_.get(),
         ownedKeys_.get(),
         ownedCounters_.get(),
         ownedRandom_.get()))
-  , ownedHlsStrategy_(CreateHlsStrategy(options, ownedHls_.get()))
+  , ownedHlsStrategy_(
+      CreateHlsStrategy(
+        options,
+        ownedHlsHigh_.get(),
+        ownedHlsGmac_.get()))
   , ownedAssociation_(
       CreateAssociation(
         *ownedChannel_,
@@ -437,9 +554,11 @@ DlmsClient::DlmsClient(const DlmsClientOptions& options)
   , xdlms_()
   , state_(ClientState::Disconnected)
   , constructionStatus_(ValidateDlmsClientOptions(options))
-  , hlsGmacAuthentication_(
+  , hlsAuthentication_(
       options.authenticationMode ==
-      ClientAuthenticationMode::HighLevelSecurityGmac)
+        ClientAuthenticationMode::HighLevelSecurity ||
+      options.authenticationMode ==
+        ClientAuthenticationMode::HighLevelSecurityGmac)
 {
   if (constructionStatus_ != ClientStatus::Ok ||
       options.securityMode == ClientSecurityMode::None) {
@@ -469,7 +588,8 @@ DlmsClient::DlmsClient(
   , ownedKeys_()
   , ownedCounters_()
   , ownedRandom_()
-  , ownedHls_()
+  , ownedHlsHigh_()
+  , ownedHlsGmac_()
   , ownedHlsStrategy_()
   , ownedAssociation_()
   , ownedSecurity_()
@@ -477,7 +597,7 @@ DlmsClient::DlmsClient(
   , xdlms_(new dlms::xdlms::XdlmsClient(channel, association))
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
-  , hlsGmacAuthentication_(false)
+  , hlsAuthentication_(false)
 {
 }
 
@@ -491,7 +611,8 @@ DlmsClient::DlmsClient(
   , ownedKeys_()
   , ownedCounters_()
   , ownedRandom_()
-  , ownedHls_()
+  , ownedHlsHigh_()
+  , ownedHlsGmac_()
   , ownedHlsStrategy_()
   , ownedAssociation_()
   , ownedSecurity_()
@@ -499,7 +620,7 @@ DlmsClient::DlmsClient(
   , xdlms_(new dlms::xdlms::XdlmsClient(channel, association, security))
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
-  , hlsGmacAuthentication_(false)
+  , hlsAuthentication_(false)
 {
 }
 
@@ -541,8 +662,8 @@ ClientStatus DlmsClient::OpenAssociation()
     return status;
   }
 
-  if (hlsGmacAuthentication_) {
-    if (ownedHls_.get() == 0 || ownedHlsStrategy_.get() == 0) {
+  if (hlsAuthentication_) {
+    if (ownedHlsStrategy_.get() == 0) {
       return ClientStatus::InternalError;
     }
 
@@ -554,7 +675,9 @@ ClientStatus DlmsClient::OpenAssociation()
     }
 
     std::vector<std::uint8_t> response;
-    if (ownedHls_->BuildResponse(SecurityView(serverChallenge), response) !=
+    if (ownedHlsStrategy_->BuildResponse(
+          SecurityView(serverChallenge),
+          response) !=
         dlms::security::SecurityStatus::Ok) {
       return ClientStatus::SecurityFailed;
     }
@@ -589,7 +712,7 @@ ClientStatus DlmsClient::OpenAssociation()
       return decodeStatus;
     }
 
-    if (ownedHls_->VerifyResponse(
+    if (ownedHlsStrategy_->VerifyResponse(
           SecurityView(ownedHlsStrategy_->ClientChallenge()),
           SecurityView(serverResponse)) != dlms::security::SecurityStatus::Ok) {
       return ClientStatus::SecurityFailed;
