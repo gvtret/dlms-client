@@ -46,6 +46,7 @@ enum class ClientAuthenticationMode
 {
   None,
   LowLevelSecurity,
+  HighLevelSecurity,
   HighLevelSecurityGmac
 };
 
@@ -53,6 +54,12 @@ struct ClientLowLevelSecurityOptions
 {
   const std::uint8_t* credential;
   std::size_t credentialSize;
+};
+
+struct ClientHighLevelSecurityOptions
+{
+  const std::uint8_t* password;
+  std::size_t passwordSize;
 };
 
 struct ClientSecurityOptions
@@ -79,6 +86,7 @@ struct DlmsClientOptions
   ClientSecurityMode securityMode;
   WrapperTcpEndpoint wrapperTcp;
   ClientLowLevelSecurityOptions lowLevelSecurity;
+  ClientHighLevelSecurityOptions highLevelSecurity;
   ClientSecurityOptions security;
   std::uint16_t clientSap;
   std::uint16_t serverSap;
@@ -182,6 +190,14 @@ authentication behavior.
 `ClientAuthenticationMode::LowLevelSecurity` requires a non-null, non-empty
 credential. The options-owned constructor copies those bytes into
 `dlms-association` and does not transform them.
+
+`ClientAuthenticationMode::HighLevelSecurity` requires a non-null, non-empty
+password. The options-owned constructor wires a password-based HLS High
+strategy into `dlms-association`. `OpenAssociation()` completes AARQ/AARE,
+invokes Association LN `reply_to_HLS_authentication`, and verifies the server
+response before reporting the facade as associated. This mode corresponds to
+COSEM HLS mechanism id `2` and to certification profiles where `bGMAC=false`
+and `HLSPassword=HiPassword`.
 
 `ClientAuthenticationMode::HighLevelSecurityGmac` requires valid client/server
 system titles and a 16-byte authentication key in `ClientSecurityOptions`. The
