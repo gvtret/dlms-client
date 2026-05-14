@@ -45,7 +45,8 @@ enum class ClientSecurityMode
 enum class ClientAuthenticationMode
 {
   None,
-  LowLevelSecurity
+  LowLevelSecurity,
+  HighLevelSecurityGmac
 };
 
 struct ClientLowLevelSecurityOptions
@@ -181,6 +182,13 @@ authentication behavior.
 `ClientAuthenticationMode::LowLevelSecurity` requires a non-null, non-empty
 credential. The options-owned constructor copies those bytes into
 `dlms-association` and does not transform them.
+
+`ClientAuthenticationMode::HighLevelSecurityGmac` requires valid client/server
+system titles and a 16-byte authentication key in `ClientSecurityOptions`. The
+options-owned constructor wires an HLS GMAC strategy into `dlms-association`.
+`OpenAssociation()` completes the AARQ/AARE exchange, invokes Association LN
+`reply_to_HLS_authentication` through xDLMS ACTION, and verifies the server
+response before reporting the facade as associated.
 
 `ClientSecurityMode::None` ignores `ClientSecurityOptions`.
 

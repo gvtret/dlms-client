@@ -169,3 +169,35 @@ Commit message:
 ```text
 feat(client): pass LLS credentials to association
 ```
+
+## Phase 11. HLS GMAC Client Options Documentation
+
+Deliverables:
+
+- public API contract for `ClientAuthenticationMode::HighLevelSecurityGmac`;
+- architecture sequence for AARQ/AARE plus Association LN pass-3/pass-4;
+- validation rules for system titles, authentication key, and random source;
+- test plan for xDLMS ACTION orchestration and server response verification.
+
+Commit message:
+
+```text
+docs(client): define HLS GMAC options
+```
+
+## Phase 12. HLS GMAC Client Options Implementation
+
+Deliverables:
+
+- HLS GMAC association strategy adapter;
+- OpenSSL-backed production random source from the MinGW toolchain;
+- options-owned HLS GMAC composition;
+- `OpenAssociation()` pass-3/pass-4 xDLMS ACTION orchestration;
+- focused tests for challenge forwarding, ACTION descriptor/parameter, and
+  verification failures.
+
+Commit message:
+
+```text
+feat(client): orchestrate HLS GMAC association
+```

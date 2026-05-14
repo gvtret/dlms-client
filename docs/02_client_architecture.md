@@ -179,7 +179,34 @@ Association authentication is separate from APDU ciphering. LLS credential
 bytes are copied into the owned association client and are not persisted,
 derived, or transformed by `dlms-client`.
 
-## 10. Test Strategy
+## 10. HLS GMAC Composition
+
+```mermaid
+sequenceDiagram
+  participant App as Application
+  participant Client as DlmsClient
+  participant Assoc as AssociationClient
+  participant HLS as HlsGmacAuthenticator
+  participant XDlms as XdlmsClient
+
+  App->>Client: construct(options with HighLevelSecurityGmac)
+  Client->>Assoc: AssociationOptions(authenticationMode=HLS, strategy)
+  App->>Client: OpenAssociation()
+  Client->>Assoc: Establish()
+  Assoc->>HLS: BuildChallenge()
+  Assoc-->>Client: AssociationResult(StoC)
+  Client->>HLS: BuildResponse(StoC)
+  Client->>XDlms: Action(Association LN.reply_to_HLS_authentication)
+  XDlms-->>Client: server response f(CtoS)
+  Client->>HLS: VerifyResponse(CtoS, response)
+```
+
+The Association LN descriptor is fixed for the first implementation:
+class id `15`, logical name `0.0.40.0.0.255`, method id `1`.
+The invocation parameter is a complete DLMS `Data` octet-string containing the
+GMAC response bytes.
+
+## 11. Test Strategy
 
 The first implementation uses fake lower-layer ports for deterministic unit
 tests. Real loopback and meter-facing tests belong in root integration or manual

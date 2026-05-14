@@ -10,6 +10,7 @@ Status and options:
 - default options select no association authentication;
 - LLS options require a non-null non-empty credential;
 - oversized LLS credentials are rejected before construction work is used;
+- HLS GMAC options require valid system titles and authentication key material;
 - invalid options reject empty host, zero port, and unsupported profile/security
   combinations.
 - security options validate system titles and key sizes for protected mode.
@@ -46,6 +47,9 @@ Security composition:
 Association authentication composition:
 
 - options-owned client maps LLS credential bytes into the AARQ;
+- options-owned client maps HLS GMAC into an association strategy;
+- HLS GMAC `OpenAssociation()` invokes Association LN method 1 after AARE;
+- HLS GMAC server response verification failure maps to `SecurityFailed`;
 - no-authentication client AARQ remains unchanged.
 
 Failure mapping:
@@ -77,9 +81,9 @@ Manual tests may use a real Wrapper endpoint with:
 
 - client 16, no security;
 - client 32, LLS password;
-- client 48, HLS HighPassword with protected APDUs when association support is
-  added.
+- client 48, HLS GMAC when the target meter supports that mechanism.
 
 Client 16 remains the first live-meter smoke path. Client 32 is enabled by LLS
 association options. Client 48 requires HLS challenge-response work before it
-becomes an automated acceptance test.
+becomes an automated acceptance test. Proprietary HLS high-password mechanisms
+remain a separate phase from HLS GMAC.
