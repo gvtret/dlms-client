@@ -23,6 +23,7 @@ DlmsClientOptions DefaultDlmsClientOptions()
 {
   DlmsClientOptions options;
   options.profile = ClientProfile::WrapperTcp;
+  options.authenticationMode = ClientAuthenticationMode::None;
   options.securityMode = ClientSecurityMode::None;
   options.wrapperTcp.host = "127.0.0.1";
   options.wrapperTcp.port = 4059u;
@@ -32,6 +33,8 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.serverSap = 1u;
   options.connectTimeoutMs = 5000u;
   options.requestTimeoutMs = 5000u;
+  options.lowLevelSecurity.credential = 0;
+  options.lowLevelSecurity.credentialSize = 0u;
   options.security.invocationCounter = 0u;
   for (std::size_t i = 0u; i < 8u; ++i) {
     options.security.clientSystemTitle[i] = 0u;
@@ -50,9 +53,24 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
     return ClientStatus::UnsupportedFeature;
   }
 
+  if (options.authenticationMode != ClientAuthenticationMode::None &&
+      options.authenticationMode !=
+        ClientAuthenticationMode::LowLevelSecurity) {
+    return ClientStatus::UnsupportedFeature;
+  }
+
   if (options.securityMode != ClientSecurityMode::None &&
       options.securityMode != ClientSecurityMode::AuthenticatedAndEncrypted) {
     return ClientStatus::UnsupportedFeature;
+  }
+
+  if (options.authenticationMode ==
+      ClientAuthenticationMode::LowLevelSecurity) {
+    if (options.lowLevelSecurity.credential == 0 ||
+        options.lowLevelSecurity.credentialSize == 0u ||
+        options.lowLevelSecurity.credentialSize > 125u) {
+      return ClientStatus::InvalidArgument;
+    }
   }
 
   if (options.wrapperTcp.host == 0 || options.wrapperTcp.host[0] == '\0') {

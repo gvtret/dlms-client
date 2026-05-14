@@ -2,6 +2,7 @@
 
 #include "dlms/client/client_status.hpp"
 
+#include <cstddef>
 #include <cstdint>
 
 namespace dlms {
@@ -16,6 +17,18 @@ enum class ClientSecurityMode
 {
   None,
   AuthenticatedAndEncrypted
+};
+
+enum class ClientAuthenticationMode
+{
+  None,
+  LowLevelSecurity
+};
+
+struct ClientLowLevelSecurityOptions
+{
+  const std::uint8_t* credential;
+  std::size_t credentialSize;
 };
 
 struct ClientSecurityOptions
@@ -38,8 +51,10 @@ struct WrapperTcpEndpoint
 struct DlmsClientOptions
 {
   ClientProfile profile;
+  ClientAuthenticationMode authenticationMode;
   ClientSecurityMode securityMode;
   WrapperTcpEndpoint wrapperTcp;
+  ClientLowLevelSecurityOptions lowLevelSecurity;
   ClientSecurityOptions security;
   std::uint16_t clientSap;
   std::uint16_t serverSap;

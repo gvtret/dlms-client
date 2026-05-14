@@ -33,6 +33,8 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
     dlms::client::DefaultDlmsClientOptions();
 
   EXPECT_EQ(dlms::client::ClientProfile::WrapperTcp, options.profile);
+  EXPECT_EQ(dlms::client::ClientAuthenticationMode::None,
+            options.authenticationMode);
   EXPECT_EQ(dlms::client::ClientSecurityMode::None, options.securityMode);
   EXPECT_STREQ("127.0.0.1", options.wrapperTcp.host);
   EXPECT_EQ(4059u, options.wrapperTcp.port);
@@ -42,6 +44,8 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
   EXPECT_EQ(1u, options.serverSap);
   EXPECT_EQ(5000u, options.connectTimeoutMs);
   EXPECT_EQ(5000u, options.requestTimeoutMs);
+  EXPECT_EQ(nullptr, options.lowLevelSecurity.credential);
+  EXPECT_EQ(0u, options.lowLevelSecurity.credentialSize);
   EXPECT_EQ(0u, options.security.invocationCounter);
   for (std::size_t i = 0u; i < 8u; ++i) {
     EXPECT_EQ(0u, options.security.clientSystemTitle[i]);
@@ -52,6 +56,41 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
     EXPECT_EQ(0u, options.security.authenticationKey[i]);
   }
   EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+}
+
+TEST(ClientOptions, ValidatesLowLevelSecurityCredential)
+{
+  const std::uint8_t credential[] = {'p', 'w'};
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::LowLevelSecurity;
+  options.lowLevelSecurity.credential = credential;
+  options.lowLevelSecurity.credentialSize = sizeof(credential);
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::LowLevelSecurity;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::LowLevelSecurity;
+  options.lowLevelSecurity.credential = credential;
+  options.lowLevelSecurity.credentialSize = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::LowLevelSecurity;
+  options.lowLevelSecurity.credential = credential;
+  options.lowLevelSecurity.credentialSize = 126u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
             dlms::client::ValidateDlmsClientOptions(options));
 }
 

@@ -101,12 +101,25 @@ dlms::profile::ApduChannelOptions MakeWrapperTcpChannelOptions(
 }
 
 dlms::association::AssociationOptions MakeAssociationOptions(
-  const DlmsClientOptions&)
+  const DlmsClientOptions& options)
 {
   dlms::association::AssociationOptions association =
     dlms::association::DefaultAssociationOptions();
-  association.authenticationMode =
-    dlms::association::AuthenticationMode::None;
+  if (options.authenticationMode ==
+      ClientAuthenticationMode::LowLevelSecurity) {
+    association.authenticationMode =
+      dlms::association::AuthenticationMode::LowLevelSecurity;
+    if (options.lowLevelSecurity.credential != 0 &&
+        options.lowLevelSecurity.credentialSize != 0u) {
+      association.lowLevelSecurityCredential.assign(
+        options.lowLevelSecurity.credential,
+        options.lowLevelSecurity.credential +
+          options.lowLevelSecurity.credentialSize);
+    }
+  } else {
+    association.authenticationMode =
+      dlms::association::AuthenticationMode::None;
+  }
   return association;
 }
 
