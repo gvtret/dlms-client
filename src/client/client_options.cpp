@@ -55,7 +55,9 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
 
   if (options.authenticationMode != ClientAuthenticationMode::None &&
       options.authenticationMode !=
-        ClientAuthenticationMode::LowLevelSecurity) {
+        ClientAuthenticationMode::LowLevelSecurity &&
+      options.authenticationMode !=
+        ClientAuthenticationMode::HighLevelSecurityGmac) {
     return ClientStatus::UnsupportedFeature;
   }
 
@@ -69,6 +71,15 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
     if (options.lowLevelSecurity.credential == 0 ||
         options.lowLevelSecurity.credentialSize == 0u ||
         options.lowLevelSecurity.credentialSize > 125u) {
+      return ClientStatus::InvalidArgument;
+    }
+  }
+
+  if (options.authenticationMode ==
+      ClientAuthenticationMode::HighLevelSecurityGmac) {
+    if (IsAllZero(options.security.clientSystemTitle) ||
+        IsAllZero(options.security.serverSystemTitle) ||
+        IsAllZero(options.security.authenticationKey)) {
       return ClientStatus::InvalidArgument;
     }
   }

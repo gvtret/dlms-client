@@ -1,17 +1,49 @@
 #include "dlms/client/client.hpp"
 
+#include "dlms/apdu/data.hpp"
 #include "dlms/association/association_types.hpp"
 #include "dlms/profile/profile_types.hpp"
 #include "dlms/security/ciphered_apdu_processor.hpp"
+#include "dlms/security/hls_gmac_authenticator.hpp"
 #include "dlms/security/in_memory_invocation_counter_store.hpp"
 #include "dlms/security/in_memory_key_store.hpp"
+#include "dlms/security/random_source.hpp"
 
 #include <cstddef>
 #include <memory>
+#include <openssl/rand.h>
 
 namespace dlms {
 namespace client {
 namespace {
+
+class OpenSslRandomSource : public dlms::security::IRandomSource
+{
+public:
+  dlms::security::SecurityStatus Fill(
+    std::uint8_t* output,
+    std::size_t outputSize) override
+  {
+    if (output == 0 && outputSize != 0u) {
+      return dlms::security::SecurityStatus::InvalidArgument;
+    }
+    if (outputSize == 0u) {
+      return dlms::security::SecurityStatus::Ok;
+    }
+    return RAND_bytes(output, static_cast<int>(outputSize)) == 1
+      ? dlms::security::SecurityStatus::Ok
+      : dlms::security::SecurityStatus::InternalError;
+  }
+};
+
+dlms::security::SecurityByteView SecurityView(
+  const std::vector<std::uint8_t>& bytes)
+{
+  dlms::security::SecurityByteView view;
+  view.data = bytes.empty() ? 0 : &bytes[0];
+  view.size = bytes.size();
+  return view;
+}
 
 ClientStatus MapAssociationStatus(
   dlms::association::AssociationStatus status)
@@ -101,7 +133,8 @@ dlms::profile::ApduChannelOptions MakeWrapperTcpChannelOptions(
 }
 
 dlms::association::AssociationOptions MakeAssociationOptions(
-  const DlmsClientOptions& options)
+  const DlmsClientOptions& options,
+  const dlms::association::IHighLevelSecurityStrategy* hlsStrategy)
 {
   dlms::association::AssociationOptions association =
     dlms::association::DefaultAssociationOptions();
@@ -116,11 +149,24 @@ dlms::association::AssociationOptions MakeAssociationOptions(
         options.lowLevelSecurity.credential +
           options.lowLevelSecurity.credentialSize);
     }
+  } else if (options.authenticationMode ==
+             ClientAuthenticationMode::HighLevelSecurityGmac) {
+    association.authenticationMode =
+      dlms::association::AuthenticationMode::HighLevelSecurity;
+    association.highLevelSecurity = hlsStrategy;
   } else {
     association.authenticationMode =
       dlms::association::AuthenticationMode::None;
   }
   return association;
+}
+
+bool UsesSecurityComponents(const DlmsClientOptions& options)
+{
+  return options.securityMode ==
+           ClientSecurityMode::AuthenticatedAndEncrypted ||
+         options.authenticationMode ==
+           ClientAuthenticationMode::HighLevelSecurityGmac;
 }
 
 dlms::security::SecurityKey MakeSecurityKey(
@@ -138,11 +184,17 @@ dlms::security::SecurityKey MakeSecurityKey(
 std::unique_ptr<dlms::security::SecurityContext> CreateSecurityContext(
   const DlmsClientOptions& options)
 {
+  if (!UsesSecurityComponents(options)) {
+    return std::unique_ptr<dlms::security::SecurityContext>();
+  }
+
   std::unique_ptr<dlms::security::SecurityContext> context(
     new dlms::security::SecurityContext(
       dlms::security::EmptySecurityContext()));
-  context->policy =
-    dlms::security::SecurityPolicy::AuthenticatedAndEncrypted;
+  context->policy = options.securityMode ==
+      ClientSecurityMode::AuthenticatedAndEncrypted
+    ? dlms::security::SecurityPolicy::AuthenticatedAndEncrypted
+    : dlms::security::SecurityPolicy::Authenticated;
   context->role = dlms::security::SecurityRole::Client;
   context->clientSap = options.clientSap;
   context->serverSap = options.serverSap;
@@ -151,6 +203,74 @@ std::unique_ptr<dlms::security::SecurityContext> CreateSecurityContext(
     context->remoteSystemTitle[i] = options.security.serverSystemTitle[i];
   }
   return context;
+}
+
+std::unique_ptr<dlms::security::InMemoryKeyStore> CreateKeyStore(
+  const DlmsClientOptions& options)
+{
+  if (!UsesSecurityComponents(options)) {
+    return std::unique_ptr<dlms::security::InMemoryKeyStore>();
+  }
+
+  std::unique_ptr<dlms::security::InMemoryKeyStore> keys(
+    new dlms::security::InMemoryKeyStore());
+  keys->SetKey(
+    MakeSecurityKey(
+      dlms::security::SecurityKeyRole::GlobalUnicastEncryption,
+      options.security.globalUnicastEncryptionKey));
+  keys->SetKey(
+    MakeSecurityKey(
+      dlms::security::SecurityKeyRole::Authentication,
+      options.security.authenticationKey));
+  return keys;
+}
+
+std::unique_ptr<dlms::security::InMemoryInvocationCounterStore>
+CreateCounterStore(const DlmsClientOptions& options)
+{
+  if (!UsesSecurityComponents(options)) {
+    return std::unique_ptr<dlms::security::InMemoryInvocationCounterStore>();
+  }
+
+  std::unique_ptr<dlms::security::InMemoryInvocationCounterStore> counters(
+    new dlms::security::InMemoryInvocationCounterStore());
+  counters->SetLocalCounter(options.security.invocationCounter);
+  return counters;
+}
+
+std::unique_ptr<dlms::security::IRandomSource> CreateRandomSource(
+  const DlmsClientOptions& options)
+{
+  if (options.authenticationMode !=
+      ClientAuthenticationMode::HighLevelSecurityGmac) {
+    return std::unique_ptr<dlms::security::IRandomSource>();
+  }
+  return std::unique_ptr<dlms::security::IRandomSource>(
+    new OpenSslRandomSource());
+}
+
+std::unique_ptr<dlms::security::HlsGmacAuthenticator> CreateHlsAuthenticator(
+  const DlmsClientOptions& options,
+  dlms::security::SecurityContext* context,
+  dlms::security::InMemoryKeyStore* keys,
+  dlms::security::InMemoryInvocationCounterStore* counters,
+  dlms::security::IRandomSource* random)
+{
+  if (options.authenticationMode !=
+      ClientAuthenticationMode::HighLevelSecurityGmac ||
+      context == 0 ||
+      keys == 0 ||
+      counters == 0 ||
+      random == 0) {
+    return std::unique_ptr<dlms::security::HlsGmacAuthenticator>();
+  }
+
+  return std::unique_ptr<dlms::security::HlsGmacAuthenticator>(
+    new dlms::security::HlsGmacAuthenticator(
+      *context,
+      *keys,
+      *counters,
+      *random));
 }
 
 std::unique_ptr<dlms::transport::TcpStreamTransport> CreateTcpStream(
@@ -170,14 +290,124 @@ std::unique_ptr<dlms::profile::WrapperTcpProfileChannel> CreateWrapperChannel(
       MakeWrapperTcpChannelOptions(options)));
 }
 
+} // namespace
+
+class ClientHlsGmacAssociationStrategy
+  : public dlms::association::IHighLevelSecurityStrategy
+{
+public:
+  explicit ClientHlsGmacAssociationStrategy(
+    dlms::security::HlsGmacAuthenticator& hls)
+    : hls_(hls)
+  {
+  }
+
+  dlms::association::HighLevelSecurityMechanism Mechanism() const override
+  {
+    return dlms::association::HighLevelSecurityMechanism::HlsGmac;
+  }
+
+  dlms::association::AssociationStatus BuildInitialChallenge(
+    std::vector<std::uint8_t>& output) const override
+  {
+    output.clear();
+    if (hls_.BuildChallenge(output) != dlms::security::SecurityStatus::Ok) {
+      return dlms::association::AssociationStatus::UnsupportedAuthentication;
+    }
+    clientChallenge_ = output;
+    return dlms::association::AssociationStatus::Ok;
+  }
+
+  const std::vector<std::uint8_t>& ClientChallenge() const
+  {
+    return clientChallenge_;
+  }
+
+private:
+  dlms::security::HlsGmacAuthenticator& hls_;
+  mutable std::vector<std::uint8_t> clientChallenge_;
+};
+
+namespace {
+
+std::unique_ptr<ClientHlsGmacAssociationStrategy> CreateHlsStrategy(
+  const DlmsClientOptions& options,
+  dlms::security::HlsGmacAuthenticator* hls)
+{
+  if (options.authenticationMode !=
+      ClientAuthenticationMode::HighLevelSecurityGmac ||
+      hls == 0) {
+    return std::unique_ptr<ClientHlsGmacAssociationStrategy>();
+  }
+
+  return std::unique_ptr<ClientHlsGmacAssociationStrategy>(
+    new ClientHlsGmacAssociationStrategy(*hls));
+}
+
 std::unique_ptr<dlms::association::AssociationClient> CreateAssociation(
   dlms::profile::IApduChannel& channel,
-  const DlmsClientOptions& options)
+  const DlmsClientOptions& options,
+  const dlms::association::IHighLevelSecurityStrategy* hlsStrategy)
 {
   return std::unique_ptr<dlms::association::AssociationClient>(
     new dlms::association::AssociationClient(
       channel,
-      MakeAssociationOptions(options)));
+      MakeAssociationOptions(options, hlsStrategy)));
+}
+
+dlms::xdlms::CosemMethodDescriptor HlsReplyMethod()
+{
+  dlms::xdlms::CosemMethodDescriptor descriptor =
+    dlms::xdlms::EmptyCosemMethodDescriptor();
+  descriptor.classId = 15u;
+  descriptor.instanceId =
+    dlms::xdlms::CosemLogicalName(0, 0, 40, 0, 0, 255);
+  descriptor.methodId = 1u;
+  return descriptor;
+}
+
+ClientStatus EncodeOctetStringData(
+  const std::vector<std::uint8_t>& bytes,
+  std::vector<std::uint8_t>& encoded)
+{
+  encoded.clear();
+  dlms::apdu::DlmsData data = {};
+  data.type = dlms::apdu::DlmsDataType::OctetString;
+  data.bytes.data = bytes.empty() ? 0 : &bytes[0];
+  data.bytes.size = bytes.size();
+
+  std::uint8_t buffer[256] = {};
+  dlms::apdu::ApduWriter writer(buffer, sizeof(buffer));
+  const dlms::apdu::ApduStatus status =
+    dlms::apdu::EncodeDlmsData(data, writer);
+  if (status != dlms::apdu::ApduStatus::Ok) {
+    return ClientStatus::InternalError;
+  }
+
+  encoded.assign(buffer, buffer + writer.WrittenSize());
+  return ClientStatus::Ok;
+}
+
+ClientStatus DecodeOctetStringData(
+  const std::vector<std::uint8_t>& encoded,
+  std::vector<std::uint8_t>& bytes)
+{
+  bytes.clear();
+  if (encoded.empty()) {
+    return ClientStatus::AssociationFailed;
+  }
+
+  dlms::apdu::DlmsData data = {};
+  const dlms::apdu::ApduStatus status =
+    dlms::apdu::DecodeDlmsData(&encoded[0], encoded.size(), 8u, data);
+  if (status != dlms::apdu::ApduStatus::Ok ||
+      data.type != dlms::apdu::DlmsDataType::OctetString ||
+      (data.bytes.data == 0 && data.bytes.size != 0u)) {
+    return ClientStatus::AssociationFailed;
+  }
+
+  bytes.assign(data.bytes.data, data.bytes.data + data.bytes.size);
+  return ClientStatus::Ok;
 }
 
 } // namespace
@@ -185,42 +415,34 @@ std::unique_ptr<dlms::association::AssociationClient> CreateAssociation(
 DlmsClient::DlmsClient(const DlmsClientOptions& options)
   : ownedStream_(CreateTcpStream(options))
   , ownedChannel_(CreateWrapperChannel(*ownedStream_, options))
-  , ownedAssociation_(CreateAssociation(*ownedChannel_, options))
-  , ownedSecurityContext_()
-  , ownedKeys_()
-  , ownedCounters_()
+  , ownedSecurityContext_(CreateSecurityContext(options))
+  , ownedKeys_(CreateKeyStore(options))
+  , ownedCounters_(CreateCounterStore(options))
+  , ownedRandom_(CreateRandomSource(options))
+  , ownedHls_(
+      CreateHlsAuthenticator(
+        options,
+        ownedSecurityContext_.get(),
+        ownedKeys_.get(),
+        ownedCounters_.get(),
+        ownedRandom_.get()))
+  , ownedHlsStrategy_(CreateHlsStrategy(options, ownedHls_.get()))
+  , ownedAssociation_(
+      CreateAssociation(
+        *ownedChannel_,
+        options,
+        ownedHlsStrategy_.get()))
   , ownedSecurity_()
   , association_(*ownedAssociation_)
   , xdlms_()
   , state_(ClientState::Disconnected)
   , constructionStatus_(ValidateDlmsClientOptions(options))
+  , hlsGmacAuthentication_(
+      options.authenticationMode ==
+      ClientAuthenticationMode::HighLevelSecurityGmac)
 {
   if (constructionStatus_ != ClientStatus::Ok ||
       options.securityMode == ClientSecurityMode::None) {
-    xdlms_.reset(
-      new dlms::xdlms::XdlmsClient(*ownedChannel_, *ownedAssociation_));
-    return;
-  }
-
-  ownedSecurityContext_ = CreateSecurityContext(options);
-  ownedKeys_.reset(new dlms::security::InMemoryKeyStore());
-  ownedCounters_.reset(
-    new dlms::security::InMemoryInvocationCounterStore());
-  ownedCounters_->SetLocalCounter(options.security.invocationCounter);
-
-  const dlms::security::SecurityStatus encryptionKeyStatus =
-    ownedKeys_->SetKey(
-      MakeSecurityKey(
-        dlms::security::SecurityKeyRole::GlobalUnicastEncryption,
-        options.security.globalUnicastEncryptionKey));
-  const dlms::security::SecurityStatus authenticationKeyStatus =
-    ownedKeys_->SetKey(
-      MakeSecurityKey(
-        dlms::security::SecurityKeyRole::Authentication,
-        options.security.authenticationKey));
-  if (encryptionKeyStatus != dlms::security::SecurityStatus::Ok ||
-      authenticationKeyStatus != dlms::security::SecurityStatus::Ok) {
-    constructionStatus_ = ClientStatus::InvalidArgument;
     xdlms_.reset(
       new dlms::xdlms::XdlmsClient(*ownedChannel_, *ownedAssociation_));
     return;
@@ -243,15 +465,19 @@ DlmsClient::DlmsClient(
   dlms::association::AssociationClient& association)
   : ownedStream_()
   , ownedChannel_()
-  , ownedAssociation_()
   , ownedSecurityContext_()
   , ownedKeys_()
   , ownedCounters_()
+  , ownedRandom_()
+  , ownedHls_()
+  , ownedHlsStrategy_()
+  , ownedAssociation_()
   , ownedSecurity_()
   , association_(association)
   , xdlms_(new dlms::xdlms::XdlmsClient(channel, association))
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
+  , hlsGmacAuthentication_(false)
 {
 }
 
@@ -261,15 +487,19 @@ DlmsClient::DlmsClient(
   dlms::security::CipheredApduProcessor& security)
   : ownedStream_()
   , ownedChannel_()
-  , ownedAssociation_()
   , ownedSecurityContext_()
   , ownedKeys_()
   , ownedCounters_()
+  , ownedRandom_()
+  , ownedHls_()
+  , ownedHlsStrategy_()
+  , ownedAssociation_()
   , ownedSecurity_()
   , association_(association)
   , xdlms_(new dlms::xdlms::XdlmsClient(channel, association, security))
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
+  , hlsGmacAuthentication_(false)
 {
 }
 
@@ -309,6 +539,61 @@ ClientStatus DlmsClient::OpenAssociation()
   const ClientStatus status = MapAssociationStatus(association_.Establish());
   if (status != ClientStatus::Ok) {
     return status;
+  }
+
+  if (hlsGmacAuthentication_) {
+    if (ownedHls_.get() == 0 || ownedHlsStrategy_.get() == 0) {
+      return ClientStatus::InternalError;
+    }
+
+    const std::vector<std::uint8_t>& serverChallenge =
+      association_.Result().highLevelSecurityServerChallenge;
+    if (serverChallenge.empty() ||
+        ownedHlsStrategy_->ClientChallenge().empty()) {
+      return ClientStatus::AssociationFailed;
+    }
+
+    std::vector<std::uint8_t> response;
+    if (ownedHls_->BuildResponse(SecurityView(serverChallenge), response) !=
+        dlms::security::SecurityStatus::Ok) {
+      return ClientStatus::SecurityFailed;
+    }
+
+    std::vector<std::uint8_t> encodedParameter;
+    ClientStatus encodeStatus =
+      EncodeOctetStringData(response, encodedParameter);
+    if (encodeStatus != ClientStatus::Ok) {
+      return encodeStatus;
+    }
+
+    dlms::xdlms::ActionResult actionResult =
+      dlms::xdlms::EmptyActionResult();
+    const ClientStatus actionStatus =
+      MapXdlmsStatus(
+        xdlms_->Action(
+          HlsReplyMethod(),
+          true,
+          encodedParameter,
+          actionResult));
+    if (actionStatus != ClientStatus::Ok) {
+      return actionStatus;
+    }
+    if (!actionResult.hasData) {
+      return ClientStatus::AssociationFailed;
+    }
+
+    std::vector<std::uint8_t> serverResponse;
+    ClientStatus decodeStatus =
+      DecodeOctetStringData(actionResult.data, serverResponse);
+    if (decodeStatus != ClientStatus::Ok) {
+      return decodeStatus;
+    }
+
+    if (ownedHls_->VerifyResponse(
+          SecurityView(ownedHlsStrategy_->ClientChallenge()),
+          SecurityView(serverResponse)) != dlms::security::SecurityStatus::Ok) {
+      return ClientStatus::SecurityFailed;
+    }
   }
 
   state_ = ClientState::Associated;

@@ -22,7 +22,8 @@ enum class ClientSecurityMode
 enum class ClientAuthenticationMode
 {
   None,
-  LowLevelSecurity
+  LowLevelSecurity,
+  HighLevelSecurityGmac
 };
 
 struct ClientLowLevelSecurityOptions

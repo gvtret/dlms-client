@@ -94,6 +94,37 @@ TEST(ClientOptions, ValidatesLowLevelSecurityCredential)
             dlms::client::ValidateDlmsClientOptions(options));
 }
 
+TEST(ClientOptions, ValidatesHighLevelSecurityGmacMaterial)
+{
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  FillSecurityOptions(options);
+  options.securityMode = dlms::client::ClientSecurityMode::None;
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::HighLevelSecurityGmac;
+  options.clientSap = 48u;
+  options.wrapperTcp.sourceWPort = 48u;
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::HighLevelSecurityGmac;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  FillSecurityOptions(options);
+  options.securityMode = dlms::client::ClientSecurityMode::None;
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::HighLevelSecurityGmac;
+  for (std::size_t i = 0u; i < 16u; ++i) {
+    options.security.authenticationKey[i] = 0u;
+  }
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+}
+
 TEST(ClientOptions, RejectsInvalidEndpointAndSapValues)
 {
   dlms::client::DlmsClientOptions options =
