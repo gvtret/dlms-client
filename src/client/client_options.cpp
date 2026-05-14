@@ -91,7 +91,6 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
   if (options.authenticationMode ==
       ClientAuthenticationMode::HighLevelSecurityGmac) {
     if (IsAllZero(options.security.clientSystemTitle) ||
-        IsAllZero(options.security.serverSystemTitle) ||
         IsAllZero(options.security.authenticationKey)) {
       return ClientStatus::InvalidArgument;
     }

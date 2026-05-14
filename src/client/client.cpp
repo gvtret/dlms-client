@@ -46,6 +46,38 @@ dlms::security::SecurityByteView SecurityView(
   return view;
 }
 
+bool IsZeroSystemTitle(const std::uint8_t title[8])
+{
+  for (std::size_t i = 0u; i < 8u; ++i) {
+    if (title[i] != 0u) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool ApplyDiscoveredRemoteSystemTitle(
+  dlms::security::SecurityContext* context,
+  const dlms::association::AssociationResult& result)
+{
+  if (context == 0) {
+    return false;
+  }
+
+  if (!IsZeroSystemTitle(context->remoteSystemTitle)) {
+    return true;
+  }
+
+  if (result.respondingApplicationTitle.size() != 8u) {
+    return false;
+  }
+
+  for (std::size_t i = 0u; i < 8u; ++i) {
+    context->remoteSystemTitle[i] = result.respondingApplicationTitle[i];
+  }
+  return true;
+}
+
 ClientStatus MapAssociationStatus(
   dlms::association::AssociationStatus status)
 {
@@ -671,6 +703,13 @@ ClientStatus DlmsClient::OpenAssociation()
       association_.Result().highLevelSecurityServerChallenge;
     if (serverChallenge.empty() ||
         ownedHlsStrategy_->ClientChallenge().empty()) {
+      return ClientStatus::AssociationFailed;
+    }
+
+    if (ownedHlsGmac_.get() != 0 &&
+        !ApplyDiscoveredRemoteSystemTitle(
+          ownedSecurityContext_.get(),
+          association_.Result())) {
       return ClientStatus::AssociationFailed;
     }
 
