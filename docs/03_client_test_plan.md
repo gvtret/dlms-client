@@ -10,7 +10,8 @@ Status and options:
 - default options select no association authentication;
 - LLS options require a non-null non-empty credential;
 - oversized LLS credentials are rejected before construction work is used;
-- HLS GMAC options require valid system titles and authentication key material;
+- HLS GMAC options require a valid client system title and authentication key
+  material; the server system title may be explicit or discovered from AARE;
 - invalid options reject empty host, zero port, and unsupported profile/security
   combinations.
 - security options validate system titles and key sizes for protected mode.
@@ -49,6 +50,8 @@ Association authentication composition:
 - options-owned client maps LLS credential bytes into the AARQ;
 - options-owned client maps HLS GMAC into an association strategy;
 - HLS GMAC `OpenAssociation()` invokes Association LN method 1 after AARE;
+- HLS GMAC copies an 8-byte AARE responding AP title into the remote system
+  title when no explicit server system title was configured;
 - HLS GMAC server response verification failure maps to `SecurityFailed`;
 - no-authentication client AARQ remains unchanged.
 

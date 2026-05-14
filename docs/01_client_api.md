@@ -199,10 +199,12 @@ response before reporting the facade as associated. This mode corresponds to
 COSEM HLS mechanism id `2` and to certification profiles where `bGMAC=false`
 and `HLSPassword=HiPassword`.
 
-`ClientAuthenticationMode::HighLevelSecurityGmac` requires valid client/server
-system titles and a 16-byte authentication key in `ClientSecurityOptions`. The
-options-owned constructor wires an HLS GMAC strategy into `dlms-association`.
-`OpenAssociation()` completes the AARQ/AARE exchange, invokes Association LN
+`ClientAuthenticationMode::HighLevelSecurityGmac` requires a valid client
+system title and a 16-byte authentication key in `ClientSecurityOptions`. The
+server system title may be supplied explicitly or discovered from an 8-byte
+AARE responding AP title. The options-owned constructor wires an HLS GMAC
+strategy into `dlms-association`. `OpenAssociation()` completes the AARQ/AARE
+exchange, resolves the remote system title, invokes Association LN
 `reply_to_HLS_authentication` through xDLMS ACTION, and verifies the server
 response before reporting the facade as associated.
 
