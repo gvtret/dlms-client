@@ -82,7 +82,9 @@ secret material used by `dlms-security`.
 
 `ClientAuthenticationMode::HighLevelSecurityGmac` shall require:
 
-- valid non-zero client and server system titles;
+- a valid non-zero client system title;
+- either a valid non-zero server system title or an 8-byte responding AP title
+  in the AARE;
 - a valid 16-byte authentication key;
 - non-zero client and server SAP values;
 - a production random source backed by OpenSSL from the MinGW toolchain.
@@ -99,11 +101,14 @@ selected.
 1. call `AssociationClient::Establish()`;
 2. for non-HLS modes, mark the client associated as today;
 3. for HLS GMAC, read `AssociationResult::highLevelSecurityServerChallenge`;
-4. build a GMAC response for the server challenge;
-5. send ACTION to Association LN method 1 with that response as a DLMS
+4. when `ClientSecurityOptions::serverSystemTitle` is all zero, copy the
+   8-byte `AssociationResult::respondingApplicationTitle` into the remote
+   system title before building/verifying GMAC values;
+5. build a GMAC response for the server challenge;
+6. send ACTION to Association LN method 1 with that response as a DLMS
    octet-string;
-6. verify the returned server response against the original client challenge;
-7. mark the client associated only after verification succeeds.
+7. verify the returned server response against the original client challenge;
+8. mark the client associated only after verification succeeds.
 
 If any HLS pass-3/pass-4 step fails, `OpenAssociation()` returns
 `AssociationFailed`, `SecurityFailed`, or the mapped xDLMS service status and
