@@ -14,6 +14,7 @@ In scope:
 - client lifecycle: connect, open association, release association, close;
 - high-level GET, SET, ACTION forwarding;
 - profile selection for Wrapper/TCP in the MVP;
+- association authentication selection for no-authentication and LLS;
 - security selection for no-security and ciphered APDU operation;
 - simple synchronous API;
 - status-code error reporting.
@@ -48,6 +49,7 @@ The MVP shall:
 - expose `DlmsClientOptions`;
 - expose `DlmsClient`;
 - support Wrapper/TCP no-security LN association;
+- support Wrapper/TCP LLS LN association;
 - support Wrapper/TCP ciphered APDU operation after association setup;
 - support public client SAP and configurable server SAP;
 - support GET using `CosemAttributeDescriptor`;
@@ -76,6 +78,8 @@ Rules:
 - injected-channel clients may receive an externally composed security
   processor for deterministic tests or advanced composition;
 - no-security association authentication remains separate from APDU ciphering.
+- LLS credentials are passed exactly as supplied to `dlms-association`; the
+  facade shall not hash, derive, persist, or otherwise transform passwords.
 
 Document RAG alignment:
 
@@ -88,7 +92,7 @@ Document RAG alignment:
 
 ## 5. Non-Goals For MVP
 
-- LLS and HLS authentication;
+- HLS authentication;
 - block transfer orchestration;
 - event notifications;
 - SN referencing;

@@ -42,6 +42,18 @@ enum class ClientSecurityMode
   AuthenticatedAndEncrypted
 };
 
+enum class ClientAuthenticationMode
+{
+  None,
+  LowLevelSecurity
+};
+
+struct ClientLowLevelSecurityOptions
+{
+  const std::uint8_t* credential;
+  std::size_t credentialSize;
+};
+
 struct ClientSecurityOptions
 {
   std::uint8_t clientSystemTitle[8];
@@ -62,8 +74,10 @@ struct WrapperTcpEndpoint
 struct DlmsClientOptions
 {
   ClientProfile profile;
+  ClientAuthenticationMode authenticationMode;
   ClientSecurityMode securityMode;
   WrapperTcpEndpoint wrapperTcp;
+  ClientLowLevelSecurityOptions lowLevelSecurity;
   ClientSecurityOptions security;
   std::uint16_t clientSap;
   std::uint16_t serverSap;
@@ -160,6 +174,13 @@ public:
 | unsupported lower-layer feature | `UnsupportedFeature` |
 
 ## 7. Security Option Rules
+
+`ClientAuthenticationMode::None` keeps the default lowest-level association
+authentication behavior.
+
+`ClientAuthenticationMode::LowLevelSecurity` requires a non-null, non-empty
+credential. The options-owned constructor copies those bytes into
+`dlms-association` and does not transform them.
 
 `ClientSecurityMode::None` ignores `ClientSecurityOptions`.
 

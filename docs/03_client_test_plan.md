@@ -7,6 +7,9 @@ Status and options:
 - status names are stable;
 - default options select Wrapper/TCP, no security, public client SAP, logical
   name association context;
+- default options select no association authentication;
+- LLS options require a non-null non-empty credential;
+- oversized LLS credentials are rejected before construction work is used;
 - invalid options reject empty host, zero port, and unsupported profile/security
   combinations.
 - security options validate system titles and key sizes for protected mode.
@@ -40,6 +43,11 @@ Security composition:
 - authenticated response failure maps to `SecurityFailed`;
 - no-security service tests remain unchanged.
 
+Association authentication composition:
+
+- options-owned client maps LLS credential bytes into the AARQ;
+- no-authentication client AARQ remains unchanged.
+
 Failure mapping:
 
 - transport open failure;
@@ -59,6 +67,7 @@ Root integration should cover:
 - public client ACTION over the same path;
 - future live-meter smoke test against configurable endpoint, disabled by
   default.
+- client SAP 32 LLS live smoke with environment-provided password;
 - protected public client GET over a fake Wrapper/TCP channel once the matching
   server security composition is available.
 
@@ -67,10 +76,10 @@ Root integration should cover:
 Manual tests may use a real Wrapper endpoint with:
 
 - client 16, no security;
-- client 32, LLS password with protected APDUs when association support is
-  added;
+- client 32, LLS password;
 - client 48, HLS HighPassword with protected APDUs when association support is
   added.
 
-Client 16 remains the first live-meter smoke path. Client 32 and 48 require
-association authentication work before they become automated acceptance tests.
+Client 16 remains the first live-meter smoke path. Client 32 is enabled by LLS
+association options. Client 48 requires HLS challenge-response work before it
+becomes an automated acceptance test.

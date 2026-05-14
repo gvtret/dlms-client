@@ -139,3 +139,33 @@ Commit message:
 ```text
 feat(client): compose security options
 ```
+
+## Phase 9. LLS Client Options Documentation
+
+Deliverables:
+
+- public association authentication option requirements;
+- API contract for `ClientAuthenticationMode::LowLevelSecurity`;
+- architecture sequence for client-to-association credential forwarding;
+- test plan for validation and AARQ forwarding.
+
+Commit message:
+
+```text
+docs(client): define LLS association options
+```
+
+## Phase 10. LLS Client Options Implementation
+
+Deliverables:
+
+- public LLS option structs;
+- validation for missing and oversized credentials;
+- options-owned association composition using LLS credentials;
+- focused tests for AARQ forwarding.
+
+Commit message:
+
+```text
+feat(client): pass LLS credentials to association
+```

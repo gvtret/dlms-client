@@ -32,7 +32,8 @@ flowchart TB
 ## 3. Public Modules
 
 - `client_status`: facade status enum and string names.
-- `client_options`: profile, endpoint, SAP, timeout, and security options.
+- `client_options`: profile, endpoint, SAP, timeout, authentication, and
+  security options.
 - `dlms_client`: lifecycle and GET/SET/ACTION facade.
 - `client_data`: optional encoded DLMS `Data` helper functions.
 
@@ -143,6 +144,7 @@ sequenceDiagram
   participant Channel as Wrapper/TCP APDU channel
 
   App->>Client: construct(options with security)
+  Client->>Client: map association authentication options
   Client->>Security: install keys, titles, counter
   App->>Client: Get/Set/Action
   Client->>XDlms: service call
@@ -158,7 +160,26 @@ sequenceDiagram
 validation, AES-GCM, and invocation counter checks. `dlms-xdlms` owns the APDU
 protect/unprotect boundary.
 
-## 9. Test Strategy
+## 9. Association Authentication Composition
+
+```mermaid
+sequenceDiagram
+  participant App as Application
+  participant Client as DlmsClient
+  participant Assoc as AssociationClient
+
+  App->>Client: construct(options with LLS credential)
+  Client->>Assoc: AssociationOptions(authenticationMode=LLS, credential)
+  App->>Client: OpenAssociation()
+  Client->>Assoc: Establish()
+  Assoc-->>Client: AssociationStatus
+```
+
+Association authentication is separate from APDU ciphering. LLS credential
+bytes are copied into the owned association client and are not persisted,
+derived, or transformed by `dlms-client`.
+
+## 10. Test Strategy
 
 The first implementation uses fake lower-layer ports for deterministic unit
 tests. Real loopback and meter-facing tests belong in root integration or manual
