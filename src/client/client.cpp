@@ -169,6 +169,7 @@ dlms::profile::ApduChannelOptions MakeWrapperTcpChannelOptions(
     dlms::profile::DefaultApduChannelOptions();
   channel.localWrapperPort = options.wrapperTcp.sourceWPort;
   channel.remoteWrapperPort = options.wrapperTcp.destinationWPort;
+  channel.wrapperTcpTraceSink = options.wrapperTcpTraceSink;
   return channel;
 }
 

@@ -36,6 +36,7 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
   EXPECT_EQ(dlms::client::ClientAuthenticationMode::None,
             options.authenticationMode);
   EXPECT_EQ(dlms::client::ClientSecurityMode::None, options.securityMode);
+  EXPECT_EQ(nullptr, options.wrapperTcpTraceSink);
   EXPECT_STREQ("127.0.0.1", options.wrapperTcp.host);
   EXPECT_EQ(4059u, options.wrapperTcp.port);
   EXPECT_EQ(16u, options.wrapperTcp.sourceWPort);

@@ -25,6 +25,7 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.profile = ClientProfile::WrapperTcp;
   options.authenticationMode = ClientAuthenticationMode::None;
   options.securityMode = ClientSecurityMode::None;
+  options.wrapperTcpTraceSink = 0;
   options.wrapperTcp.host = "127.0.0.1";
   options.wrapperTcp.port = 4059u;
   options.wrapperTcp.sourceWPort = 16u;

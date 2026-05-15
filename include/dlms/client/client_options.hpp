@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dlms/client/client_status.hpp"
+#include "dlms/profile/profile_types.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -82,6 +83,7 @@ struct DlmsClientOptions
   ClientLowLevelSecurityOptions lowLevelSecurity;
   ClientHighLevelSecurityOptions highLevelSecurity;
   ClientSecurityOptions security;
+  dlms::profile::IWrapperTcpTraceSink* wrapperTcpTraceSink;
   std::uint16_t clientSap;
   std::uint16_t serverSap;
   std::uint32_t connectTimeoutMs;
