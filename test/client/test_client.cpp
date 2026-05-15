@@ -300,6 +300,19 @@ TEST(DlmsClient, OptionsConstructorAcceptsSecurityComposition)
   EXPECT_FALSE(client.IsAssociated());
 }
 
+TEST(DlmsClient, OptionsConstructorAcceptsHdlcTcpProfile)
+{
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+
+  dlms::client::DlmsClient client(options);
+
+  EXPECT_EQ(dlms::client::ClientState::Disconnected, client.State());
+  EXPECT_FALSE(client.IsConnected());
+  EXPECT_FALSE(client.IsAssociated());
+}
+
 TEST(DlmsClient, OptionsConstructorReportsInvalidOptionsOnConnect)
 {
   dlms::client::DlmsClientOptions options =

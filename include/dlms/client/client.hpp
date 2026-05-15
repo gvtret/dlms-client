@@ -5,7 +5,6 @@
 
 #include "dlms/association/association_client.hpp"
 #include "dlms/profile/apdu_channel.hpp"
-#include "dlms/profile/wrapper_tcp_profile_channel.hpp"
 #include "dlms/transport/tcp_stream_transport.hpp"
 #include "dlms/xdlms/xdlms_client.hpp"
 
@@ -81,7 +80,7 @@ private:
   DlmsClient& operator=(const DlmsClient&);
 
   std::unique_ptr<dlms::transport::TcpStreamTransport> ownedStream_;
-  std::unique_ptr<dlms::profile::WrapperTcpProfileChannel> ownedChannel_;
+  std::unique_ptr<dlms::profile::IApduChannel> ownedChannel_;
   std::unique_ptr<dlms::security::SecurityContext> ownedSecurityContext_;
   std::unique_ptr<dlms::security::InMemoryKeyStore> ownedKeys_;
   std::unique_ptr<dlms::security::InMemoryInvocationCounterStore>

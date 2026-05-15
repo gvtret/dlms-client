@@ -29,6 +29,17 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.wrapperTcp.port = 4059u;
   options.wrapperTcp.sourceWPort = 16u;
   options.wrapperTcp.destinationWPort = 1u;
+  options.hdlcTcp.host = "127.0.0.1";
+  options.hdlcTcp.port = 4059u;
+  options.hdlcTcp.clientAddress = 16u;
+  options.hdlcTcp.logicalDeviceAddress = 1u;
+  options.hdlcTcp.physicalDeviceAddress = 0u;
+  options.hdlcTcp.maxInfoTx = 128u;
+  options.hdlcTcp.maxInfoRx = 128u;
+  options.hdlcTcp.windowSizeTx = 1u;
+  options.hdlcTcp.windowSizeRx = 1u;
+  options.hdlcTcp.retryCount = 3u;
+  options.hdlcTcp.retryDelayMs = 10u;
   options.clientSap = 16u;
   options.serverSap = 1u;
   options.connectTimeoutMs = 5000u;
@@ -51,7 +62,8 @@ DlmsClientOptions DefaultDlmsClientOptions()
 
 ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
 {
-  if (options.profile != ClientProfile::WrapperTcp) {
+  if (options.profile != ClientProfile::WrapperTcp &&
+      options.profile != ClientProfile::HdlcTcp) {
     return ClientStatus::UnsupportedFeature;
   }
 
@@ -96,18 +108,39 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
     }
   }
 
-  if (options.wrapperTcp.host == 0 || options.wrapperTcp.host[0] == '\0') {
-    return ClientStatus::InvalidArgument;
-  }
-
-  if (options.wrapperTcp.port == 0u ||
-      options.wrapperTcp.sourceWPort == 0u ||
-      options.wrapperTcp.destinationWPort == 0u ||
-      options.clientSap == 0u ||
+  if (options.clientSap == 0u ||
       options.serverSap == 0u ||
       options.connectTimeoutMs == 0u ||
       options.requestTimeoutMs == 0u) {
     return ClientStatus::InvalidArgument;
+  }
+
+  if (options.profile == ClientProfile::WrapperTcp) {
+    if (options.wrapperTcp.host == 0 ||
+        options.wrapperTcp.host[0] == '\0' ||
+        options.wrapperTcp.port == 0u ||
+        options.wrapperTcp.sourceWPort == 0u ||
+        options.wrapperTcp.destinationWPort == 0u) {
+      return ClientStatus::InvalidArgument;
+    }
+  }
+
+  if (options.profile == ClientProfile::HdlcTcp) {
+    if (options.hdlcTcp.host == 0 ||
+        options.hdlcTcp.host[0] == '\0' ||
+        options.hdlcTcp.port == 0u ||
+        options.hdlcTcp.clientAddress == 0u ||
+        options.hdlcTcp.clientAddress > 0x7fu ||
+        options.hdlcTcp.logicalDeviceAddress == 0u ||
+        options.hdlcTcp.logicalDeviceAddress > 0x3fffu ||
+        options.hdlcTcp.physicalDeviceAddress > 0x3fffu ||
+        options.hdlcTcp.maxInfoTx == 0u ||
+        options.hdlcTcp.maxInfoRx == 0u ||
+        options.hdlcTcp.windowSizeTx == 0u ||
+        options.hdlcTcp.windowSizeRx == 0u ||
+        options.hdlcTcp.retryDelayMs == 0u) {
+      return ClientStatus::InvalidArgument;
+    }
   }
 
   if (options.securityMode == ClientSecurityMode::AuthenticatedAndEncrypted &&

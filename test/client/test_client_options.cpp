@@ -40,6 +40,17 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
   EXPECT_EQ(4059u, options.wrapperTcp.port);
   EXPECT_EQ(16u, options.wrapperTcp.sourceWPort);
   EXPECT_EQ(1u, options.wrapperTcp.destinationWPort);
+  EXPECT_STREQ("127.0.0.1", options.hdlcTcp.host);
+  EXPECT_EQ(4059u, options.hdlcTcp.port);
+  EXPECT_EQ(16u, options.hdlcTcp.clientAddress);
+  EXPECT_EQ(1u, options.hdlcTcp.logicalDeviceAddress);
+  EXPECT_EQ(0u, options.hdlcTcp.physicalDeviceAddress);
+  EXPECT_EQ(128u, options.hdlcTcp.maxInfoTx);
+  EXPECT_EQ(128u, options.hdlcTcp.maxInfoRx);
+  EXPECT_EQ(1u, options.hdlcTcp.windowSizeTx);
+  EXPECT_EQ(1u, options.hdlcTcp.windowSizeRx);
+  EXPECT_EQ(3u, options.hdlcTcp.retryCount);
+  EXPECT_EQ(10u, options.hdlcTcp.retryDelayMs);
   EXPECT_EQ(16u, options.clientSap);
   EXPECT_EQ(1u, options.serverSap);
   EXPECT_EQ(5000u, options.connectTimeoutMs);
@@ -58,6 +69,67 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
     EXPECT_EQ(0u, options.security.authenticationKey[i]);
   }
   EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+}
+
+TEST(ClientOptions, ValidatesHdlcTcpEndpoint)
+{
+  dlms::client::DlmsClientOptions options =
+    dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options.wrapperTcp.host = "";
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  options.hdlcTcp.host = "";
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  options.hdlcTcp.port = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  options.hdlcTcp.clientAddress = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  options.hdlcTcp.logicalDeviceAddress = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  options.hdlcTcp.maxInfoTx = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  options.hdlcTcp.maxInfoRx = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  options.hdlcTcp.windowSizeTx = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.profile = dlms::client::ClientProfile::HdlcTcp;
+  options.hdlcTcp.windowSizeRx = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
             dlms::client::ValidateDlmsClientOptions(options));
 }
 

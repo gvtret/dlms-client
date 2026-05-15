@@ -10,7 +10,8 @@ namespace client {
 
 enum class ClientProfile
 {
-  WrapperTcp
+  WrapperTcp,
+  HdlcTcp
 };
 
 enum class ClientSecurityMode
@@ -56,12 +57,28 @@ struct WrapperTcpEndpoint
   std::uint16_t destinationWPort;
 };
 
+struct HdlcTcpEndpoint
+{
+  const char* host;
+  std::uint16_t port;
+  std::uint8_t clientAddress;
+  std::uint16_t logicalDeviceAddress;
+  std::uint16_t physicalDeviceAddress;
+  std::size_t maxInfoTx;
+  std::size_t maxInfoRx;
+  std::uint8_t windowSizeTx;
+  std::uint8_t windowSizeRx;
+  std::uint8_t retryCount;
+  std::uint32_t retryDelayMs;
+};
+
 struct DlmsClientOptions
 {
   ClientProfile profile;
   ClientAuthenticationMode authenticationMode;
   ClientSecurityMode securityMode;
   WrapperTcpEndpoint wrapperTcp;
+  HdlcTcpEndpoint hdlcTcp;
   ClientLowLevelSecurityOptions lowLevelSecurity;
   ClientHighLevelSecurityOptions highLevelSecurity;
   ClientSecurityOptions security;

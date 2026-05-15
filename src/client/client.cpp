@@ -2,7 +2,9 @@
 
 #include "dlms/apdu/data.hpp"
 #include "dlms/association/association_types.hpp"
+#include "dlms/profile/hdlc_profile_channel.hpp"
 #include "dlms/profile/profile_types.hpp"
+#include "dlms/profile/wrapper_tcp_profile_channel.hpp"
 #include "dlms/security/ciphered_apdu_processor.hpp"
 #include "dlms/security/hls_high_authenticator.hpp"
 #include "dlms/security/hls_gmac_authenticator.hpp"
@@ -147,8 +149,13 @@ dlms::transport::TcpStreamTransportOptions MakeTcpOptions(
   const DlmsClientOptions& options)
 {
   dlms::transport::TcpStreamTransportOptions tcp;
-  tcp.host = options.wrapperTcp.host == 0 ? "" : options.wrapperTcp.host;
-  tcp.port = options.wrapperTcp.port;
+  if (options.profile == ClientProfile::HdlcTcp) {
+    tcp.host = options.hdlcTcp.host == 0 ? "" : options.hdlcTcp.host;
+    tcp.port = options.hdlcTcp.port;
+  } else {
+    tcp.host = options.wrapperTcp.host == 0 ? "" : options.wrapperTcp.host;
+    tcp.port = options.wrapperTcp.port;
+  }
   tcp.connectTimeout.milliseconds = options.connectTimeoutMs;
   tcp.readTimeout.milliseconds = options.requestTimeoutMs;
   tcp.writeTimeout.milliseconds = options.requestTimeoutMs;
@@ -162,6 +169,26 @@ dlms::profile::ApduChannelOptions MakeWrapperTcpChannelOptions(
     dlms::profile::DefaultApduChannelOptions();
   channel.localWrapperPort = options.wrapperTcp.sourceWPort;
   channel.remoteWrapperPort = options.wrapperTcp.destinationWPort;
+  return channel;
+}
+
+dlms::profile::ApduChannelOptions MakeHdlcTcpChannelOptions(
+  const DlmsClientOptions& options)
+{
+  dlms::profile::ApduChannelOptions channel =
+    dlms::profile::DefaultApduChannelOptions();
+  channel.hdlcClientAddress = options.hdlcTcp.clientAddress;
+  channel.hdlcLogicalDeviceAddress = options.hdlcTcp.logicalDeviceAddress;
+  channel.hdlcPhysicalDeviceAddress = options.hdlcTcp.physicalDeviceAddress;
+  channel.hdlcDirection = dlms::profile::HdlcProfileDirection::ClientToServer;
+  channel.hdlcRole = dlms::profile::HdlcProfileRole::Client;
+  channel.hdlcUseSession = true;
+  channel.hdlcMaxInformationFieldLengthTransmit = options.hdlcTcp.maxInfoTx;
+  channel.hdlcMaxInformationFieldLengthReceive = options.hdlcTcp.maxInfoRx;
+  channel.hdlcWindowSizeTransmit = options.hdlcTcp.windowSizeTx;
+  channel.hdlcWindowSizeReceive = options.hdlcTcp.windowSizeRx;
+  channel.hdlcRetryCount = options.hdlcTcp.retryCount;
+  channel.hdlcRetryDelayMilliseconds = options.hdlcTcp.retryDelayMs;
   return channel;
 }
 
@@ -338,11 +365,18 @@ std::unique_ptr<dlms::transport::TcpStreamTransport> CreateTcpStream(
     new dlms::transport::TcpStreamTransport(MakeTcpOptions(options)));
 }
 
-std::unique_ptr<dlms::profile::WrapperTcpProfileChannel> CreateWrapperChannel(
+std::unique_ptr<dlms::profile::IApduChannel> CreateProfileChannel(
   dlms::transport::IByteStream& stream,
   const DlmsClientOptions& options)
 {
-  return std::unique_ptr<dlms::profile::WrapperTcpProfileChannel>(
+  if (options.profile == ClientProfile::HdlcTcp) {
+    return std::unique_ptr<dlms::profile::IApduChannel>(
+      new dlms::profile::HdlcProfileChannel(
+        stream,
+        MakeHdlcTcpChannelOptions(options)));
+  }
+
+  return std::unique_ptr<dlms::profile::IApduChannel>(
     new dlms::profile::WrapperTcpProfileChannel(
       stream,
       MakeWrapperTcpChannelOptions(options)));
@@ -555,7 +589,7 @@ ClientStatus DecodeOctetStringData(
 
 DlmsClient::DlmsClient(const DlmsClientOptions& options)
   : ownedStream_(CreateTcpStream(options))
-  , ownedChannel_(CreateWrapperChannel(*ownedStream_, options))
+  , ownedChannel_(CreateProfileChannel(*ownedStream_, options))
   , ownedSecurityContext_(CreateSecurityContext(options))
   , ownedKeys_(CreateKeyStore(options))
   , ownedCounters_(CreateCounterStore(options))
@@ -673,6 +707,16 @@ ClientStatus DlmsClient::Connect()
   const ClientStatus status = MapAssociationStatus(association_.Open());
   if (status != ClientStatus::Ok) {
     return status;
+  }
+
+  dlms::profile::HdlcProfileChannel* hdlc =
+    dynamic_cast<dlms::profile::HdlcProfileChannel*>(ownedChannel_.get());
+  if (hdlc != 0) {
+    const dlms::profile::ProfileStatus linkStatus = hdlc->ConnectDataLink();
+    if (linkStatus != dlms::profile::ProfileStatus::Ok) {
+      association_.Close();
+      return ClientStatus::ChannelOpenFailed;
+    }
   }
 
   state_ = ClientState::Connected;
