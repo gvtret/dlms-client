@@ -33,7 +33,8 @@ should not need to include lower-layer status enums for basic client usage.
 ```cpp
 enum class ClientProfile
 {
-  WrapperTcp
+  WrapperTcp,
+  HdlcTcp
 };
 
 enum class ClientSecurityMode
@@ -79,12 +80,28 @@ struct WrapperTcpEndpoint
   std::uint16_t destinationWPort;
 };
 
+struct HdlcTcpEndpoint
+{
+  const char* host;
+  std::uint16_t port;
+  std::uint8_t clientAddress;
+  std::uint16_t logicalDeviceAddress;
+  std::uint16_t physicalDeviceAddress;
+  std::size_t maxInfoTx;
+  std::size_t maxInfoRx;
+  std::uint8_t windowSizeTx;
+  std::uint8_t windowSizeRx;
+  std::uint8_t retryCount;
+  std::uint32_t retryDelayMs;
+};
+
 struct DlmsClientOptions
 {
   ClientProfile profile;
   ClientAuthenticationMode authenticationMode;
   ClientSecurityMode securityMode;
   WrapperTcpEndpoint wrapperTcp;
+  HdlcTcpEndpoint hdlcTcp;
   ClientLowLevelSecurityOptions lowLevelSecurity;
   ClientHighLevelSecurityOptions highLevelSecurity;
   ClientSecurityOptions security;
@@ -153,9 +170,13 @@ public:
 
 ## 5. Lifecycle Rules
 
-- The options constructor owns a Wrapper/TCP byte stream, Wrapper/TCP APDU
-  channel, association client, xDLMS service client, and optional security
+- The options constructor owns a TCP byte stream, selected APDU channel,
+  association client, xDLMS service client, and optional security
   stores/processor.
+- For `ClientProfile::WrapperTcp`, `Connect()` opens the Wrapper/TCP APDU
+  channel.
+- For `ClientProfile::HdlcTcp`, `Connect()` opens the TCP-backed HDLC profile
+  channel and establishes the HDLC data link before returning `Ok`.
 - The injected constructor receives an already constructed APDU channel and
   association client for deterministic tests or external composition.
 - The injected security constructor also receives an already constructed

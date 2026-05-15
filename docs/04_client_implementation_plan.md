@@ -201,3 +201,36 @@ Commit message:
 ```text
 feat(client): orchestrate HLS GMAC association
 ```
+
+## Phase 13. HDLC/TCP Profile Documentation
+
+Deliverables:
+
+- public API contract for `ClientProfile::HdlcTcp`;
+- HDLC/TCP endpoint option requirements;
+- architecture sequence for TCP open plus HDLC data-link connect;
+- test plan for validation and lifecycle composition.
+
+Commit message:
+
+```text
+docs(client): define HDLC TCP profile option
+```
+
+## Phase 14. HDLC/TCP Profile Implementation
+
+Deliverables:
+
+- `ClientProfile::HdlcTcp`;
+- `HdlcTcpEndpoint` options;
+- validation for HDLC/TCP endpoint fields;
+- options-owned composition of `TcpStreamTransport`, `HdlcProfileChannel`,
+  `AssociationClient`, and `XdlmsClient`;
+- `Connect()` data-link establishment for HDLC/TCP;
+- focused unit tests.
+
+Commit message:
+
+```text
+feat(client): compose HDLC TCP profile
+```

@@ -13,7 +13,7 @@ In scope:
 - client options and endpoint configuration;
 - client lifecycle: connect, open association, release association, close;
 - high-level GET, SET, ACTION forwarding;
-- profile selection for Wrapper/TCP in the MVP;
+- profile selection for Wrapper/TCP and HDLC/TCP;
 - association authentication selection for no-authentication and LLS;
 - security selection for no-security and ciphered APDU operation;
 - simple synchronous API;
@@ -51,6 +51,7 @@ The MVP shall:
 - support Wrapper/TCP no-security LN association;
 - support Wrapper/TCP LLS LN association;
 - support Wrapper/TCP ciphered APDU operation after association setup;
+- support HDLC/TCP LN association using the existing HDLC/LLC profile channel;
 - support public client SAP and configurable server SAP;
 - support GET using `CosemAttributeDescriptor`;
 - support SET using encoded DLMS `Data` bytes;
@@ -103,6 +104,8 @@ Document RAG alignment:
 
 - Applications can create a client from options.
 - The client can connect to a Wrapper/TCP APDU channel.
+- The client can connect to an HDLC/TCP APDU channel and establish the HDLC
+  data link before opening the application association.
 - The client can open a no-security LN association.
 - The client can call GET/SET/ACTION through `dlms-xdlms`.
 - The client can configure suite 0 authenticated-encrypted APDU protection and

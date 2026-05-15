@@ -15,11 +15,15 @@ Status and options:
 - invalid options reject empty host, zero port, and unsupported profile/security
   combinations.
 - security options validate system titles and key sizes for protected mode.
+- HDLC/TCP options validate host, TCP port, HDLC addresses, information field
+  sizes, window sizes, retry count, and retry delay.
 
 Lifecycle:
 
 - new client starts disconnected;
 - `Connect()` opens transport and APDU channel;
+- `Connect()` for HDLC/TCP also performs data-link connect before reporting
+  connected state;
 - `OpenAssociation()` requires connected state;
 - successful association moves to associated state;
 - `ReleaseAssociation()` returns to disconnected state because the current
@@ -74,6 +78,7 @@ Root integration should cover:
 - public client ACTION over the same path;
 - future live-meter smoke test against configurable endpoint, disabled by
   default.
+- opt-in HDLC/TCP live-meter smoke mode against configurable endpoint.
 - client SAP 32 LLS live smoke with environment-provided password;
 - protected public client GET over a fake Wrapper/TCP channel once the matching
   server security composition is available.

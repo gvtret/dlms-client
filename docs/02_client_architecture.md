@@ -70,6 +70,7 @@ classDiagram
     -ClientState state
     -TcpStreamTransport ownedStream
     -WrapperTcpProfileChannel ownedChannel
+    -HdlcProfileChannel ownedHdlcChannel
     -AssociationClient ownedAssociation
     -InMemoryKeyStore ownedKeys
     -InMemoryInvocationCounterStore ownedCounters
@@ -98,6 +99,7 @@ classDiagram
   class DlmsClientOptions
   class TcpStreamTransport
   class WrapperTcpProfileChannel
+  class HdlcProfileChannel
   class IApduChannel
   class AssociationClient
   class CipheredApduProcessor
@@ -106,12 +108,39 @@ classDiagram
   DlmsClient --> DlmsClientOptions
   DlmsClient --> TcpStreamTransport
   DlmsClient --> WrapperTcpProfileChannel
+  DlmsClient --> HdlcProfileChannel
   DlmsClient --> ClientState
   DlmsClient --> IApduChannel
   DlmsClient --> AssociationClient
   DlmsClient --> CipheredApduProcessor
   DlmsClient --> XdlmsClient
 ```
+
+## 5.1 HDLC/TCP Options-Owned Composition
+
+```mermaid
+sequenceDiagram
+  participant App as Application
+  participant Client as DlmsClient
+  participant Tcp as TcpStreamTransport
+  participant Hdlc as HdlcProfileChannel
+  participant Assoc as AssociationClient
+
+  App->>Client: construct(options profile=HdlcTcp)
+  Client->>Tcp: create TCP stream
+  Client->>Hdlc: create HDLC profile channel
+  Client->>Assoc: create association client over Hdlc
+  App->>Client: Connect()
+  Client->>Hdlc: Open()
+  Hdlc->>Tcp: Open()
+  Client->>Hdlc: ConnectDataLink()
+  App->>Client: OpenAssociation()
+  Client->>Assoc: Establish()
+```
+
+`dlms-client` only selects and owns the profile channel. Address encoding,
+SNRM/UA negotiation, HDLC retries, LLC headers, and APDU extraction remain in
+`dlms-profile`, `dlms-hdlc`, and `dlms-llc`.
 
 ## 6. State Machine
 
