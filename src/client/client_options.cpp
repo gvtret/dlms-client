@@ -27,6 +27,8 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.securityMode = ClientSecurityMode::None;
   options.wrapperTcpTraceSink = 0;
   options.associationTraceSink = 0;
+  options.associationProposedDlmsVersionNumber =
+    dlms::association::DefaultAssociationOptions().proposedDlmsVersionNumber;
   options.associationProposedConformance =
     dlms::association::DefaultAssociationOptions().proposedConformance;
   options.associationClientMaxReceivePduSize =
@@ -116,6 +118,7 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
 
   if (options.clientSap == 0u ||
       options.serverSap == 0u ||
+      options.associationProposedDlmsVersionNumber == 0u ||
       options.associationClientMaxReceivePduSize == 0u ||
       options.connectTimeoutMs == 0u ||
       options.requestTimeoutMs == 0u) {
