@@ -27,6 +27,10 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.securityMode = ClientSecurityMode::None;
   options.wrapperTcpTraceSink = 0;
   options.associationTraceSink = 0;
+  options.associationHasProposedQualityOfService =
+    dlms::association::DefaultAssociationOptions().hasProposedQualityOfService;
+  options.associationProposedQualityOfService =
+    dlms::association::DefaultAssociationOptions().proposedQualityOfService;
   options.associationProposedDlmsVersionNumber =
     dlms::association::DefaultAssociationOptions().proposedDlmsVersionNumber;
   options.associationProposedConformance =

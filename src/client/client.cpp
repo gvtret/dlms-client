@@ -200,6 +200,10 @@ dlms::association::AssociationOptions MakeAssociationOptions(
   dlms::association::AssociationOptions association =
     dlms::association::DefaultAssociationOptions();
   association.traceSink = options.associationTraceSink;
+  association.hasProposedQualityOfService =
+    options.associationHasProposedQualityOfService;
+  association.proposedQualityOfService =
+    options.associationProposedQualityOfService;
   association.proposedDlmsVersionNumber =
     options.associationProposedDlmsVersionNumber;
   association.proposedConformance = options.associationProposedConformance;

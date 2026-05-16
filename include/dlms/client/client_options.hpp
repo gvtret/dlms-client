@@ -86,6 +86,8 @@ struct DlmsClientOptions
   ClientSecurityOptions security;
   dlms::profile::IWrapperTcpTraceSink* wrapperTcpTraceSink;
   dlms::association::IAssociationTraceSink* associationTraceSink;
+  bool associationHasProposedQualityOfService;
+  std::int8_t associationProposedQualityOfService;
   std::uint8_t associationProposedDlmsVersionNumber;
   dlms::apdu::AxdrConformance associationProposedConformance;
   std::uint16_t associationClientMaxReceivePduSize;

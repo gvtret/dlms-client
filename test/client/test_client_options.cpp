@@ -38,6 +38,8 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
   EXPECT_EQ(dlms::client::ClientSecurityMode::None, options.securityMode);
   EXPECT_EQ(nullptr, options.wrapperTcpTraceSink);
   EXPECT_EQ(nullptr, options.associationTraceSink);
+  EXPECT_FALSE(options.associationHasProposedQualityOfService);
+  EXPECT_EQ(0, options.associationProposedQualityOfService);
   EXPECT_EQ(6u, options.associationProposedDlmsVersionNumber);
   EXPECT_EQ(0x00u, options.associationProposedConformance.bytes[0]);
   EXPECT_EQ(0x7eu, options.associationProposedConformance.bytes[1]);
@@ -287,6 +289,12 @@ TEST(ClientOptions, RejectsZeroTimeouts)
 
   options.connectTimeoutMs = 0u;
   EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.associationHasProposedQualityOfService = true;
+  options.associationProposedQualityOfService = 1;
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
             dlms::client::ValidateDlmsClientOptions(options));
 
   options = dlms::client::DefaultDlmsClientOptions();
