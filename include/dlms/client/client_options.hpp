@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dlms/association/association_types.hpp"
 #include "dlms/client/client_status.hpp"
 #include "dlms/profile/profile_types.hpp"
 
@@ -84,6 +85,7 @@ struct DlmsClientOptions
   ClientHighLevelSecurityOptions highLevelSecurity;
   ClientSecurityOptions security;
   dlms::profile::IWrapperTcpTraceSink* wrapperTcpTraceSink;
+  dlms::association::IAssociationTraceSink* associationTraceSink;
   std::uint16_t clientSap;
   std::uint16_t serverSap;
   std::uint32_t connectTimeoutMs;

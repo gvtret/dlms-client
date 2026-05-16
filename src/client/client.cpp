@@ -199,6 +199,7 @@ dlms::association::AssociationOptions MakeAssociationOptions(
 {
   dlms::association::AssociationOptions association =
     dlms::association::DefaultAssociationOptions();
+  association.traceSink = options.associationTraceSink;
   if (options.authenticationMode ==
       ClientAuthenticationMode::LowLevelSecurity) {
     association.authenticationMode =
