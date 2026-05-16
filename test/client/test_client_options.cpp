@@ -38,6 +38,7 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
   EXPECT_EQ(dlms::client::ClientSecurityMode::None, options.securityMode);
   EXPECT_EQ(nullptr, options.wrapperTcpTraceSink);
   EXPECT_EQ(nullptr, options.associationTraceSink);
+  EXPECT_EQ(0x0200u, options.associationClientMaxReceivePduSize);
   EXPECT_STREQ("127.0.0.1", options.wrapperTcp.host);
   EXPECT_EQ(4059u, options.wrapperTcp.port);
   EXPECT_EQ(16u, options.wrapperTcp.sourceWPort);
@@ -281,6 +282,11 @@ TEST(ClientOptions, RejectsZeroTimeouts)
     dlms::client::DefaultDlmsClientOptions();
 
   options.connectTimeoutMs = 0u;
+  EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options = dlms::client::DefaultDlmsClientOptions();
+  options.associationClientMaxReceivePduSize = 0u;
   EXPECT_EQ(dlms::client::ClientStatus::InvalidArgument,
             dlms::client::ValidateDlmsClientOptions(options));
 

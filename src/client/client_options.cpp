@@ -27,6 +27,8 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.securityMode = ClientSecurityMode::None;
   options.wrapperTcpTraceSink = 0;
   options.associationTraceSink = 0;
+  options.associationClientMaxReceivePduSize =
+    dlms::association::DefaultAssociationOptions().clientMaxReceivePduSize;
   options.wrapperTcp.host = "127.0.0.1";
   options.wrapperTcp.port = 4059u;
   options.wrapperTcp.sourceWPort = 16u;
@@ -112,6 +114,7 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
 
   if (options.clientSap == 0u ||
       options.serverSap == 0u ||
+      options.associationClientMaxReceivePduSize == 0u ||
       options.connectTimeoutMs == 0u ||
       options.requestTimeoutMs == 0u) {
     return ClientStatus::InvalidArgument;
