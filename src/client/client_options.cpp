@@ -27,6 +27,8 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.securityMode = ClientSecurityMode::None;
   options.wrapperTcpTraceSink = 0;
   options.associationTraceSink = 0;
+  options.associationProposedConformance =
+    dlms::association::DefaultAssociationOptions().proposedConformance;
   options.associationClientMaxReceivePduSize =
     dlms::association::DefaultAssociationOptions().clientMaxReceivePduSize;
   options.wrapperTcp.host = "127.0.0.1";

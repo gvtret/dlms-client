@@ -86,6 +86,7 @@ struct DlmsClientOptions
   ClientSecurityOptions security;
   dlms::profile::IWrapperTcpTraceSink* wrapperTcpTraceSink;
   dlms::association::IAssociationTraceSink* associationTraceSink;
+  dlms::apdu::AxdrConformance associationProposedConformance;
   std::uint16_t associationClientMaxReceivePduSize;
   std::uint16_t clientSap;
   std::uint16_t serverSap;

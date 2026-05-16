@@ -200,6 +200,7 @@ dlms::association::AssociationOptions MakeAssociationOptions(
   dlms::association::AssociationOptions association =
     dlms::association::DefaultAssociationOptions();
   association.traceSink = options.associationTraceSink;
+  association.proposedConformance = options.associationProposedConformance;
   association.clientMaxReceivePduSize =
     options.associationClientMaxReceivePduSize;
   if (options.authenticationMode ==
