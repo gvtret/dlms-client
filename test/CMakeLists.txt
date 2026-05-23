@@ -20,4 +20,13 @@ target_link_libraries(dlms_client_tests
     GTest::gtest_main)
 
 include(GoogleTest)
-gtest_discover_tests(dlms_client_tests)
+if(WIN32)
+  get_filename_component(DLMS_MINGW_BIN_DIR
+    "${CMAKE_CXX_COMPILER}" DIRECTORY)
+  add_test(NAME dlms_client_tests
+    COMMAND ${CMAKE_COMMAND} -E env
+      "PATH=${DLMS_MINGW_BIN_DIR}"
+      $<TARGET_FILE:dlms_client_tests>)
+else()
+  gtest_discover_tests(dlms_client_tests)
+endif()
