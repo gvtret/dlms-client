@@ -230,6 +230,9 @@ dlms::association::AssociationOptions MakeAssociationOptions(
     association.authenticationMode =
       dlms::association::AuthenticationMode::HighLevelSecurity;
     association.highLevelSecurity = hlsStrategy;
+    association.callingApplicationTitle.assign(
+      options.security.clientSystemTitle,
+      options.security.clientSystemTitle + 8u);
   } else {
     association.authenticationMode =
       dlms::association::AuthenticationMode::None;
