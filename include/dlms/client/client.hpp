@@ -91,6 +91,7 @@ private:
   std::unique_ptr<ClientHlsAssociationStrategy> ownedHlsStrategy_;
   std::unique_ptr<dlms::association::AssociationClient> ownedAssociation_;
   std::unique_ptr<dlms::security::CipheredApduProcessor> ownedSecurity_;
+  dlms::profile::IApduChannel& channel_;
   dlms::association::AssociationClient& association_;
   std::unique_ptr<dlms::xdlms::XdlmsClient> xdlms_;
   ClientState state_;

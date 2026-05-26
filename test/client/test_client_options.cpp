@@ -275,6 +275,14 @@ TEST(ClientOptions, ValidatesAuthenticatedEncryptedSecurityOptions)
   EXPECT_EQ(dlms::client::ClientStatus::Ok,
             dlms::client::ValidateDlmsClientOptions(options));
 
+  options.authenticationMode =
+    dlms::client::ClientAuthenticationMode::HighLevelSecurityGmac;
+  for (std::size_t i = 0u; i < 8u; ++i) {
+    options.security.serverSystemTitle[i] = 0u;
+  }
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+
   options = dlms::client::DefaultDlmsClientOptions();
   options.securityMode =
     dlms::client::ClientSecurityMode::AuthenticatedAndEncrypted;

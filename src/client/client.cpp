@@ -630,6 +630,7 @@ DlmsClient::DlmsClient(const DlmsClientOptions& options)
         options,
         ownedHlsStrategy_.get()))
   , ownedSecurity_()
+  , channel_(*ownedChannel_)
   , association_(*ownedAssociation_)
   , xdlms_()
   , state_(ClientState::Disconnected)
@@ -673,6 +674,7 @@ DlmsClient::DlmsClient(
   , ownedHlsStrategy_()
   , ownedAssociation_()
   , ownedSecurity_()
+  , channel_(channel)
   , association_(association)
   , xdlms_(new dlms::xdlms::XdlmsClient(channel, association))
   , state_(ClientState::Disconnected)
@@ -696,6 +698,7 @@ DlmsClient::DlmsClient(
   , ownedHlsStrategy_()
   , ownedAssociation_()
   , ownedSecurity_()
+  , channel_(channel)
   , association_(association)
   , xdlms_(new dlms::xdlms::XdlmsClient(channel, association, security))
   , state_(ClientState::Disconnected)
@@ -786,11 +789,19 @@ ClientStatus DlmsClient::OpenAssociation()
       return encodeStatus;
     }
 
+    std::unique_ptr<dlms::xdlms::XdlmsClient> plainHlsClient;
+    dlms::xdlms::XdlmsClient* hlsClient = xdlms_.get();
+    if (ownedSecurity_.get() != 0) {
+      plainHlsClient.reset(
+        new dlms::xdlms::XdlmsClient(channel_, association_));
+      hlsClient = plainHlsClient.get();
+    }
+
     dlms::xdlms::ActionResult actionResult =
       dlms::xdlms::EmptyActionResult();
     const ClientStatus actionStatus =
       MapXdlmsStatus(
-        xdlms_->Action(
+        hlsClient->Action(
           HlsReplyMethod(),
           true,
           encodedParameter,

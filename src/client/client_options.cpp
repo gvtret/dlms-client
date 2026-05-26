@@ -157,12 +157,17 @@ ClientStatus ValidateDlmsClientOptions(const DlmsClientOptions& options)
     }
   }
 
-  if (options.securityMode == ClientSecurityMode::AuthenticatedAndEncrypted &&
-      (IsAllZero(options.security.clientSystemTitle) ||
-       IsAllZero(options.security.serverSystemTitle) ||
-       IsAllZero(options.security.globalUnicastEncryptionKey) ||
-       IsAllZero(options.security.authenticationKey))) {
-    return ClientStatus::InvalidArgument;
+  if (options.securityMode == ClientSecurityMode::AuthenticatedAndEncrypted) {
+    if (IsAllZero(options.security.clientSystemTitle) ||
+        IsAllZero(options.security.globalUnicastEncryptionKey) ||
+        IsAllZero(options.security.authenticationKey)) {
+      return ClientStatus::InvalidArgument;
+    }
+    if (IsAllZero(options.security.serverSystemTitle) &&
+        options.authenticationMode !=
+          ClientAuthenticationMode::HighLevelSecurityGmac) {
+      return ClientStatus::InvalidArgument;
+    }
   }
 
   return ClientStatus::Ok;
