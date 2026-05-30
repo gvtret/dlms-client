@@ -183,7 +183,7 @@ dlms::profile::ApduChannelOptions MakeHdlcTcpChannelOptions(
   channel.hdlcPhysicalDeviceAddress = options.hdlcTcp.physicalDeviceAddress;
   channel.hdlcDirection = dlms::profile::HdlcProfileDirection::ClientToServer;
   channel.hdlcRole = dlms::profile::HdlcProfileRole::Client;
-  channel.hdlcUseSession = true;
+  channel.hdlcUseSession = options.hdlcTcp.useDataLinkSession;
   channel.hdlcMaxInformationFieldLengthTransmit = options.hdlcTcp.maxInfoTx;
   channel.hdlcMaxInformationFieldLengthReceive = options.hdlcTcp.maxInfoRx;
   channel.hdlcWindowSizeTransmit = options.hdlcTcp.windowSizeTx;
@@ -640,6 +640,9 @@ DlmsClient::DlmsClient(const DlmsClientOptions& options)
         ClientAuthenticationMode::HighLevelSecurity ||
       options.authenticationMode ==
         ClientAuthenticationMode::HighLevelSecurityGmac)
+  , ownsHdlcDataLinkSession_(
+      options.profile == ClientProfile::HdlcTcp &&
+      options.hdlcTcp.useDataLinkSession)
 {
   if (constructionStatus_ != ClientStatus::Ok ||
       options.securityMode == ClientSecurityMode::None) {
@@ -680,6 +683,7 @@ DlmsClient::DlmsClient(
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
   , hlsAuthentication_(false)
+  , ownsHdlcDataLinkSession_(false)
 {
 }
 
@@ -704,6 +708,7 @@ DlmsClient::DlmsClient(
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
   , hlsAuthentication_(false)
+  , ownsHdlcDataLinkSession_(false)
 {
 }
 
@@ -728,7 +733,7 @@ ClientStatus DlmsClient::Connect()
 
   dlms::profile::HdlcProfileChannel* hdlc =
     dynamic_cast<dlms::profile::HdlcProfileChannel*>(ownedChannel_.get());
-  if (hdlc != 0) {
+  if (hdlc != 0 && ownsHdlcDataLinkSession_) {
     const dlms::profile::ProfileStatus linkStatus = hdlc->ConnectDataLink();
     if (linkStatus != dlms::profile::ProfileStatus::Ok) {
       association_.Close();

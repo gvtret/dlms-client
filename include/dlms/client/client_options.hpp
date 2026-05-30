@@ -72,6 +72,7 @@ struct HdlcTcpEndpoint
   std::uint8_t windowSizeRx;
   std::uint8_t retryCount;
   std::uint32_t retryDelayMs;
+  bool useDataLinkSession;
 };
 
 struct DlmsClientOptions

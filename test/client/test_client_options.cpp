@@ -60,6 +60,7 @@ TEST(ClientOptions, DefaultsSelectWrapperTcpNoSecurity)
   EXPECT_EQ(1u, options.hdlcTcp.windowSizeRx);
   EXPECT_EQ(3u, options.hdlcTcp.retryCount);
   EXPECT_EQ(10u, options.hdlcTcp.retryDelayMs);
+  EXPECT_TRUE(options.hdlcTcp.useDataLinkSession);
   EXPECT_EQ(16u, options.clientSap);
   EXPECT_EQ(1u, options.serverSap);
   EXPECT_EQ(5000u, options.connectTimeoutMs);
@@ -86,6 +87,10 @@ TEST(ClientOptions, ValidatesHdlcTcpEndpoint)
   dlms::client::DlmsClientOptions options =
     dlms::client::DefaultDlmsClientOptions();
   options.profile = dlms::client::ClientProfile::HdlcTcp;
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            dlms::client::ValidateDlmsClientOptions(options));
+
+  options.hdlcTcp.useDataLinkSession = false;
   EXPECT_EQ(dlms::client::ClientStatus::Ok,
             dlms::client::ValidateDlmsClientOptions(options));
 

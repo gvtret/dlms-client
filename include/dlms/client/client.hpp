@@ -97,6 +97,7 @@ private:
   ClientState state_;
   ClientStatus constructionStatus_;
   bool hlsAuthentication_;
+  bool ownsHdlcDataLinkSession_;
 };
 
 const char* ClientStateName(ClientState state);

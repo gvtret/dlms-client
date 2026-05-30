@@ -133,14 +133,16 @@ sequenceDiagram
   App->>Client: Connect()
   Client->>Hdlc: Open()
   Hdlc->>Tcp: Open()
-  Client->>Hdlc: ConnectDataLink()
+  opt useDataLinkSession
+    Client->>Hdlc: ConnectDataLink()
+  end
   App->>Client: OpenAssociation()
   Client->>Assoc: Establish()
 ```
 
 `dlms-client` only selects and owns the profile channel. Address encoding,
-SNRM/UA negotiation, HDLC retries, LLC headers, and APDU extraction remain in
-`dlms-profile`, `dlms-hdlc`, and `dlms-llc`.
+optional SNRM/UA negotiation, HDLC retries, LLC headers, and APDU extraction
+remain in `dlms-profile`, `dlms-hdlc`, and `dlms-llc`.
 
 ## 6. State Machine
 

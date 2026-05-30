@@ -52,6 +52,7 @@ DlmsClientOptions DefaultDlmsClientOptions()
   options.hdlcTcp.windowSizeRx = 1u;
   options.hdlcTcp.retryCount = 3u;
   options.hdlcTcp.retryDelayMs = 10u;
+  options.hdlcTcp.useDataLinkSession = true;
   options.clientSap = 16u;
   options.serverSap = 1u;
   options.connectTimeoutMs = 5000u;

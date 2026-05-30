@@ -22,8 +22,8 @@ Lifecycle:
 
 - new client starts disconnected;
 - `Connect()` opens transport and APDU channel;
-- `Connect()` for HDLC/TCP also performs data-link connect before reporting
-  connected state;
+- `Connect()` for HDLC/TCP performs data-link connect only when
+  `useDataLinkSession` is enabled;
 - `OpenAssociation()` requires connected state;
 - successful association moves to associated state;
 - `ReleaseAssociation()` returns to disconnected state because the current

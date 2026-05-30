@@ -93,6 +93,7 @@ struct HdlcTcpEndpoint
   std::uint8_t windowSizeRx;
   std::uint8_t retryCount;
   std::uint32_t retryDelayMs;
+  bool useDataLinkSession;
 };
 
 struct DlmsClientOptions
@@ -176,7 +177,9 @@ public:
 - For `ClientProfile::WrapperTcp`, `Connect()` opens the Wrapper/TCP APDU
   channel.
 - For `ClientProfile::HdlcTcp`, `Connect()` opens the TCP-backed HDLC profile
-  channel and establishes the HDLC data link before returning `Ok`.
+  channel. When `HdlcTcpEndpoint::useDataLinkSession` is `true`, it also
+  establishes the HDLC data link before returning `Ok`. When it is `false`,
+  the profile uses no-session HDLC framing.
 - The injected constructor receives an already constructed APDU channel and
   association client for deterministic tests or external composition.
 - The injected security constructor also receives an already constructed
