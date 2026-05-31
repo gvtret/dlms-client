@@ -13,6 +13,8 @@ In scope:
 - client options and endpoint configuration;
 - client lifecycle: connect, open association, release association, close;
 - high-level GET, SET, ACTION forwarding;
+- an abstract xDLMS service boundary for externally composed service
+  implementations;
 - profile selection for Wrapper/TCP and HDLC/TCP;
 - association authentication selection for no-authentication and LLS;
 - security selection for no-security and ciphered APDU operation;
@@ -81,6 +83,13 @@ Rules:
 - no-security association authentication remains separate from APDU ciphering.
 - LLS credentials are passed exactly as supplied to `dlms-association`; the
   facade shall not hash, derive, persist, or otherwise transform passwords.
+
+## 4.1 Abstract Service Boundary
+
+The facade's GET/SET/ACTION methods depend on `IClientXdlmsService`, not only
+on the concrete `dlms::xdlms::XdlmsClient`. The default options and injected
+channel constructors still adapt the concrete xDLMS client, while applications
+that own a custom service layer may inject their own `IClientXdlmsService`.
 
 Document RAG alignment:
 

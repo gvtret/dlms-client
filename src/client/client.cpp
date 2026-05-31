@@ -39,6 +39,56 @@ public:
   }
 };
 
+class XdlmsClientServiceAdapter : public IClientXdlmsService
+{
+public:
+  XdlmsClientServiceAdapter(
+    dlms::profile::IApduChannel& channel,
+    dlms::association::AssociationClient& association)
+    : client_(channel, association)
+  {
+  }
+
+  XdlmsClientServiceAdapter(
+    dlms::profile::IApduChannel& channel,
+    dlms::association::AssociationClient& association,
+    dlms::security::CipheredApduProcessor& security)
+    : client_(channel, association, security)
+  {
+  }
+
+  dlms::xdlms::XdlmsStatus Get(
+    const CosemAttributeDescriptor& descriptor,
+    dlms::xdlms::GetResult& result)
+  {
+    return client_.Get(descriptor, result);
+  }
+
+  dlms::xdlms::XdlmsStatus Set(
+    const CosemAttributeDescriptor& descriptor,
+    const std::vector<std::uint8_t>& encodedData,
+    dlms::xdlms::SetResult& result)
+  {
+    return client_.Set(descriptor, encodedData, result);
+  }
+
+  dlms::xdlms::XdlmsStatus Action(
+    const CosemMethodDescriptor& descriptor,
+    bool hasParameter,
+    const std::vector<std::uint8_t>& encodedParameter,
+    dlms::xdlms::ActionResult& result)
+  {
+    return client_.Action(
+      descriptor,
+      hasParameter,
+      encodedParameter,
+      result);
+  }
+
+private:
+  dlms::xdlms::XdlmsClient client_;
+};
+
 dlms::security::SecurityByteView SecurityView(
   const std::vector<std::uint8_t>& bytes)
 {
@@ -398,6 +448,10 @@ std::unique_ptr<dlms::profile::IApduChannel> CreateProfileChannel(
 
 } // namespace
 
+IClientXdlmsService::~IClientXdlmsService()
+{
+}
+
 class ClientHlsAssociationStrategy
   : public dlms::association::IHighLevelSecurityStrategy
 {
@@ -630,9 +684,10 @@ DlmsClient::DlmsClient(const DlmsClientOptions& options)
         options,
         ownedHlsStrategy_.get()))
   , ownedSecurity_()
+  , ownedXdlms_()
   , channel_(*ownedChannel_)
   , association_(*ownedAssociation_)
-  , xdlms_()
+  , xdlms_(0)
   , state_(ClientState::Disconnected)
   , constructionStatus_(ValidateDlmsClientOptions(options))
   , hlsAuthentication_(
@@ -646,8 +701,9 @@ DlmsClient::DlmsClient(const DlmsClientOptions& options)
 {
   if (constructionStatus_ != ClientStatus::Ok ||
       options.securityMode == ClientSecurityMode::None) {
-    xdlms_.reset(
-      new dlms::xdlms::XdlmsClient(*ownedChannel_, *ownedAssociation_));
+    ownedXdlms_.reset(
+      new XdlmsClientServiceAdapter(*ownedChannel_, *ownedAssociation_));
+    xdlms_ = ownedXdlms_.get();
     return;
   }
 
@@ -656,11 +712,12 @@ DlmsClient::DlmsClient(const DlmsClientOptions& options)
       *ownedSecurityContext_,
       *ownedKeys_,
       *ownedCounters_));
-  xdlms_.reset(
-    new dlms::xdlms::XdlmsClient(
+  ownedXdlms_.reset(
+    new XdlmsClientServiceAdapter(
       *ownedChannel_,
       *ownedAssociation_,
       *ownedSecurity_));
+  xdlms_ = ownedXdlms_.get();
 }
 
 DlmsClient::DlmsClient(
@@ -677,9 +734,36 @@ DlmsClient::DlmsClient(
   , ownedHlsStrategy_()
   , ownedAssociation_()
   , ownedSecurity_()
+  , ownedXdlms_(new XdlmsClientServiceAdapter(channel, association))
   , channel_(channel)
   , association_(association)
-  , xdlms_(new dlms::xdlms::XdlmsClient(channel, association))
+  , xdlms_(ownedXdlms_.get())
+  , state_(ClientState::Disconnected)
+  , constructionStatus_(ClientStatus::Ok)
+  , hlsAuthentication_(false)
+  , ownsHdlcDataLinkSession_(false)
+{
+}
+
+DlmsClient::DlmsClient(
+  dlms::profile::IApduChannel& channel,
+  dlms::association::AssociationClient& association,
+  IClientXdlmsService& xdlms)
+  : ownedStream_()
+  , ownedChannel_()
+  , ownedSecurityContext_()
+  , ownedKeys_()
+  , ownedCounters_()
+  , ownedRandom_()
+  , ownedHlsHigh_()
+  , ownedHlsGmac_()
+  , ownedHlsStrategy_()
+  , ownedAssociation_()
+  , ownedSecurity_()
+  , ownedXdlms_()
+  , channel_(channel)
+  , association_(association)
+  , xdlms_(&xdlms)
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
   , hlsAuthentication_(false)
@@ -702,9 +786,10 @@ DlmsClient::DlmsClient(
   , ownedHlsStrategy_()
   , ownedAssociation_()
   , ownedSecurity_()
+  , ownedXdlms_(new XdlmsClientServiceAdapter(channel, association, security))
   , channel_(channel)
   , association_(association)
-  , xdlms_(new dlms::xdlms::XdlmsClient(channel, association, security))
+  , xdlms_(ownedXdlms_.get())
   , state_(ClientState::Disconnected)
   , constructionStatus_(ClientStatus::Ok)
   , hlsAuthentication_(false)
@@ -794,11 +879,11 @@ ClientStatus DlmsClient::OpenAssociation()
       return encodeStatus;
     }
 
-    std::unique_ptr<dlms::xdlms::XdlmsClient> plainHlsClient;
-    dlms::xdlms::XdlmsClient* hlsClient = xdlms_.get();
+    std::unique_ptr<XdlmsClientServiceAdapter> plainHlsClient;
+    IClientXdlmsService* hlsClient = xdlms_;
     if (ownedSecurity_.get() != 0) {
       plainHlsClient.reset(
-        new dlms::xdlms::XdlmsClient(channel_, association_));
+        new XdlmsClientServiceAdapter(channel_, association_));
       hlsClient = plainHlsClient.get();
     }
 

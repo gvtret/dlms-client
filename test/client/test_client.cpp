@@ -93,6 +93,77 @@ public:
   std::vector<std::uint8_t> nextReceive;
 };
 
+class FakeXdlmsService : public dlms::client::IClientXdlmsService
+{
+public:
+  FakeXdlmsService()
+    : getStatus(dlms::xdlms::XdlmsStatus::Ok)
+    , setStatus(dlms::xdlms::XdlmsStatus::Ok)
+    , actionStatus(dlms::xdlms::XdlmsStatus::Ok)
+    , getCalls(0)
+    , setCalls(0)
+    , actionCalls(0)
+    , lastActionHasParameter(false)
+  {
+  }
+
+  dlms::xdlms::XdlmsStatus Get(
+    const dlms::client::CosemAttributeDescriptor& descriptor,
+    dlms::xdlms::GetResult& result)
+  {
+    ++getCalls;
+    lastGetDescriptor = descriptor;
+    result = dlms::xdlms::EmptyGetResult();
+    if (getStatus == dlms::xdlms::XdlmsStatus::Ok) {
+      result.invokeId = 1u;
+      result.hasData = true;
+      result.data.push_back(0x12u);
+      result.data.push_back(0x13u);
+      result.data.push_back(0x57u);
+    }
+    return getStatus;
+  }
+
+  dlms::xdlms::XdlmsStatus Set(
+    const dlms::client::CosemAttributeDescriptor& descriptor,
+    const std::vector<std::uint8_t>& encodedData,
+    dlms::xdlms::SetResult& result)
+  {
+    ++setCalls;
+    lastSetDescriptor = descriptor;
+    lastSetData = encodedData;
+    result = dlms::xdlms::EmptySetResult();
+    return setStatus;
+  }
+
+  dlms::xdlms::XdlmsStatus Action(
+    const dlms::client::CosemMethodDescriptor& descriptor,
+    bool hasParameter,
+    const std::vector<std::uint8_t>& encodedParameter,
+    dlms::xdlms::ActionResult& result)
+  {
+    ++actionCalls;
+    lastActionDescriptor = descriptor;
+    lastActionHasParameter = hasParameter;
+    lastActionParameter = encodedParameter;
+    result = dlms::xdlms::EmptyActionResult();
+    return actionStatus;
+  }
+
+  dlms::xdlms::XdlmsStatus getStatus;
+  dlms::xdlms::XdlmsStatus setStatus;
+  dlms::xdlms::XdlmsStatus actionStatus;
+  int getCalls;
+  int setCalls;
+  int actionCalls;
+  dlms::client::CosemAttributeDescriptor lastGetDescriptor;
+  dlms::client::CosemAttributeDescriptor lastSetDescriptor;
+  dlms::client::CosemMethodDescriptor lastActionDescriptor;
+  bool lastActionHasParameter;
+  std::vector<std::uint8_t> lastSetData;
+  std::vector<std::uint8_t> lastActionParameter;
+};
+
 std::vector<std::uint8_t> MakeAareBytes()
 {
   const std::uint8_t kAare[] = {
@@ -418,6 +489,24 @@ TEST(DlmsClient, GetForwardsToXdlmsClient)
   EXPECT_EQ(dlms::client::ClientStatus::Ok,
             client.Get(MakeDescriptor(), output));
   EXPECT_EQ(MakeLongUnsignedBytes(0x2468u), output);
+}
+
+TEST(DlmsClient, GetCanUseInjectedXdlmsService)
+{
+  FakeApduChannel channel;
+  dlms::association::AssociationClient association(
+    channel,
+    dlms::association::DefaultAssociationOptions());
+  FakeXdlmsService xdlms;
+  dlms::client::DlmsClient client(channel, association, xdlms);
+  EstablishFacade(client, channel);
+
+  std::vector<std::uint8_t> output;
+  EXPECT_EQ(dlms::client::ClientStatus::Ok,
+            client.Get(MakeDescriptor(), output));
+
+  EXPECT_EQ(1, xdlms.getCalls);
+  EXPECT_EQ(MakeLongUnsignedBytes(0x1357u), output);
 }
 
 TEST(DlmsClient, InjectedSecurityProtectsGetRequest)

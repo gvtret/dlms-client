@@ -130,6 +130,27 @@ later, but they must remain thin wrappers over this encoded-data API.
 ## 4. Client Class
 
 ```cpp
+class IClientXdlmsService
+{
+public:
+  virtual ~IClientXdlmsService();
+
+  virtual dlms::xdlms::XdlmsStatus Get(
+    const CosemAttributeDescriptor& descriptor,
+    dlms::xdlms::GetResult& result) = 0;
+
+  virtual dlms::xdlms::XdlmsStatus Set(
+    const CosemAttributeDescriptor& descriptor,
+    const std::vector<std::uint8_t>& encodedData,
+    dlms::xdlms::SetResult& result) = 0;
+
+  virtual dlms::xdlms::XdlmsStatus Action(
+    const CosemMethodDescriptor& descriptor,
+    bool hasParameter,
+    const std::vector<std::uint8_t>& encodedParameter,
+    dlms::xdlms::ActionResult& result) = 0;
+};
+
 class DlmsClient
 {
 public:
@@ -138,6 +159,11 @@ public:
   DlmsClient(
     dlms::profile::IApduChannel& channel,
     dlms::association::AssociationClient& association);
+
+  DlmsClient(
+    dlms::profile::IApduChannel& channel,
+    dlms::association::AssociationClient& association,
+    IClientXdlmsService& xdlms);
 
   DlmsClient(
     dlms::profile::IApduChannel& channel,
@@ -182,6 +208,9 @@ public:
   the profile uses no-session HDLC framing.
 - The injected constructor receives an already constructed APDU channel and
   association client for deterministic tests or external composition.
+- The injected xDLMS service constructor keeps facade lifecycle management over
+  the supplied APDU channel and association client, but forwards GET/SET/ACTION
+  to caller-provided `IClientXdlmsService`.
 - The injected security constructor also receives an already constructed
   `CipheredApduProcessor`.
 - `Connect()` opens the APDU channel through `AssociationClient`.

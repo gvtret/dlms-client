@@ -47,7 +47,8 @@ flowchart LR
   Channel["IApduChannel"]
   Association["AssociationClient"]
   Security["CipheredApduProcessor"]
-  Services["XdlmsClient"]
+  Services["IClientXdlmsService"]
+  XdlmsClient["XdlmsClient adapter"]
 
   Options --> Client
   Client --> Stream
@@ -57,9 +58,10 @@ flowchart LR
   Client --> Association
   Client --> Security
   Client --> Services
-  Services --> Channel
-  Services --> Association
-  Services --> Security
+  XdlmsClient --> Services
+  XdlmsClient --> Channel
+  XdlmsClient --> Association
+  XdlmsClient --> Security
 ```
 
 ## 5. Class Interaction Diagram
@@ -76,9 +78,10 @@ classDiagram
     -InMemoryInvocationCounterStore ownedCounters
     -CipheredApduProcessor ownedSecurity
     -AssociationClient& association
-    -XdlmsClient xdlms
+    -IClientXdlmsService xdlms
     +DlmsClient(options)
     +DlmsClient(IApduChannel, AssociationClient)
+    +DlmsClient(IApduChannel, AssociationClient, IClientXdlmsService)
     +Connect() ClientStatus
     +OpenAssociation() ClientStatus
     +ReleaseAssociation() ClientStatus
@@ -103,7 +106,7 @@ classDiagram
   class IApduChannel
   class AssociationClient
   class CipheredApduProcessor
-  class XdlmsClient
+  class IClientXdlmsService
 
   DlmsClient --> DlmsClientOptions
   DlmsClient --> TcpStreamTransport
@@ -113,7 +116,7 @@ classDiagram
   DlmsClient --> IApduChannel
   DlmsClient --> AssociationClient
   DlmsClient --> CipheredApduProcessor
-  DlmsClient --> XdlmsClient
+  DlmsClient --> IClientXdlmsService
 ```
 
 ## 5.1 HDLC/TCP Options-Owned Composition

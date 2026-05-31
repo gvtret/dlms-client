@@ -35,6 +35,7 @@ Service forwarding:
 
 - `Get()` requires associated state;
 - `Get()` forwards descriptor to `dlms-xdlms`;
+- injected `IClientXdlmsService` can replace the concrete xDLMS service path;
 - `Get()` copies encoded data on success;
 - `Set()` forwards descriptor and encoded data;
 - `Action()` forwards method descriptor and optional parameter;
